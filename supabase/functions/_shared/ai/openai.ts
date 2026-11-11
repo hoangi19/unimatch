@@ -20,6 +20,8 @@ export const openai: Adapter = {
     const headers = new Headers(config.extraHeaders);
     headers.set("content-type", "application/json");
     headers.set("authorization", `Bearer ${config.apiKey}`);
+    // FPT AI Marketplace documents an `api-key` header; Bearer is sent too until a live key confirms which one it reads.
+    if (config.kind === "quyet") headers.set("api-key", config.apiKey);
     return { url: `${config.baseUrl.replace(/\/+$/, "")}/chat/completions`, headers, body };
   },
 

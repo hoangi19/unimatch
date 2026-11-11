@@ -10,12 +10,15 @@ export const LANGUAGES: readonly Language[] = ['vi', 'en', 'auto']
 
 export type ProviderRow = Tables<'ai_providers'>
 export type SettingsRow = Tables<'bot_settings'>
-export type Saved = { settings: SettingsRow; providers: ProviderRow[] }
+export type GuardrailRow = Tables<'guardrail_model'>
+export type Saved = { settings: SettingsRow; providers: ProviderRow[]; guardrail: GuardrailRow }
 
 export const PROMPT_MAX = 6000
 export const TEMPERATURE = { min: 0, max: 1.5, step: 0.1 }
 export const MAX_TOKENS_MIN = 64
 export const RATE_LIMIT = { min: 1, max: 500 }
+// Matches the Messenger text limit the off-topic message is sent with.
+export const OFF_TOPIC_MAX = 2000
 // Claude and OpenAI's GPT-5 models reject `temperature`, so the engine only sends it to these.
 export const USES_TEMPERATURE: ReadonlySet<ProviderKind> = new Set(['hermes', 'custom'])
 // Hermes and custom endpoints are set by the admin; OpenAI and Claude use their fixed vendor URL.
@@ -32,12 +35,21 @@ export type ProviderForm = {
   key: string
   removeKey: boolean
 }
+export type ModelError = 'reply' | 'handoff'
 export type Guardrails = {
   refused_topics: string[]
   handoff_on_keyword: boolean
   handoff_on_low_confidence: boolean
   handoff_on_complaint: boolean
+  // Model guardrail (Quyet): read by the reply engine in supabase/functions/_shared/bot/engine.ts.
+  model_enabled: boolean
+  handoff_on_human_request: boolean
+  refuse_off_topic: boolean
+  on_model_error: ModelError
+  off_topic_message: string
 }
+/** The guardrail model's connection; the key is write-only like a provider key. */
+export type GuardrailForm = { base_url: string; model: string; key: string; removeKey: boolean }
 export type SettingsForm = {
   active_provider: ProviderKind
   temperature: number
@@ -50,7 +62,7 @@ export type SettingsForm = {
   rate_limit_per_hour: string
   guardrails: Guardrails
 }
-export type Draft = { settings: SettingsForm; providers: Record<ProviderKind, ProviderForm> }
+export type Draft = { settings: SettingsForm; providers: Record<ProviderKind, ProviderForm>; guardrail: GuardrailForm }
 
 const obj = (value: Json): Record<string, Json | undefined> =>
   value && typeof value === 'object' && !Array.isArray(value) ? value : {}
@@ -63,10 +75,15 @@ function guardrailsOf(value: Json): Guardrails {
     handoff_on_keyword: g.handoff_on_keyword === true,
     handoff_on_low_confidence: g.handoff_on_low_confidence === true,
     handoff_on_complaint: g.handoff_on_complaint === true,
+    model_enabled: g.model_enabled === true,
+    handoff_on_human_request: g.handoff_on_human_request === true,
+    refuse_off_topic: g.refuse_off_topic === true,
+    on_model_error: g.on_model_error === 'handoff' ? 'handoff' : 'reply',
+    off_topic_message: typeof g.off_topic_message === 'string' ? g.off_topic_message : '',
   }
 }
 
-export function toDraft({ settings, providers }: Saved): Draft {
+export function toDraft({ settings, providers, guardrail }: Saved): Draft {
   const forms = {} as Record<ProviderKind, ProviderForm>
   for (const row of providers) {
     forms[row.kind] = {
@@ -93,6 +110,7 @@ export function toDraft({ settings, providers }: Saved): Draft {
       guardrails: guardrailsOf(settings.guardrails),
     },
     providers: forms,
+    guardrail: { base_url: guardrail.base_url, model: guardrail.model, key: '', removeKey: false },
   }
 }
 
@@ -112,12 +130,17 @@ export function changes(saved: Draft, draft: Draft): string[] {
       if (field === 'key' ? b.key.trim() !== '' : !same(a[field], b[field])) paths.push(`${kind}.${field}`)
     }
   }
+  for (const field of Object.keys(draft.guardrail) as (keyof GuardrailForm)[]) {
+    const b = draft.guardrail
+    if (field === 'key' ? b.key.trim() !== '' : !same(saved.guardrail[field], b[field])) paths.push(`guardrail.${field}`)
+  }
   return paths
 }
 
 const URL_RE = /^https:\/\/[^/?#@\s]+/
 const HEADER_RE = /^[A-Za-z0-9-]+$/
 const isInt = (s: string) => /^\d+$/.test(s.trim())
+const badKey = (key: string) => key.length < 8 || key.length > 512 || /\s/.test(key)
 
 export type Errors = Record<string, MessageKey>
 
@@ -140,7 +163,7 @@ export function validate(draft: Draft): Errors {
       if (name && names.indexOf(name) !== i) errors[`${kind}.headers.${i}`] = 'chatbot.err.headerDup'
     })
     const key = p.key.trim()
-    if (key && (key.length < 8 || key.length > 512 || /\s/.test(key))) errors[`${kind}.key`] = 'chatbot.err.key'
+    if (key && badKey(key)) errors[`${kind}.key`] = 'chatbot.err.key'
   }
   if (!isInt(s.max_tokens) || Number(s.max_tokens) < MAX_TOKENS_MIN) errors['settings.max_tokens'] = 'chatbot.err.maxTokens'
   if (!s.system_prompt.trim()) errors['settings.system_prompt'] = 'chatbot.err.required'
@@ -151,6 +174,13 @@ export function validate(draft: Draft): Errors {
   const rate = Number(s.rate_limit_per_hour)
   if (!isInt(s.rate_limit_per_hour) || rate < RATE_LIMIT.min || rate > RATE_LIMIT.max) errors['settings.rate_limit_per_hour'] = 'chatbot.err.rate'
   if (!s.handoff_message.trim()) errors['settings.handoff_message'] = 'chatbot.err.required'
+  const g = draft.guardrail
+  if (!URL_RE.test(g.base_url.trim())) errors['guardrail.base_url'] = g.base_url.trim() ? 'chatbot.err.url' : 'chatbot.err.required'
+  if (!g.model.trim()) errors['guardrail.model'] = 'chatbot.err.required'
+  if (g.key.trim() && badKey(g.key.trim())) errors['guardrail.key'] = 'chatbot.err.key'
+  const offTopic = s.guardrails.off_topic_message
+  if (offTopic.length > OFF_TOPIC_MAX) errors['settings.guardrails.off_topic_message'] = 'guardrail.err.long'
+  else if (s.guardrails.refuse_off_topic && !offTopic.trim()) errors['settings.guardrails.off_topic_message'] = 'chatbot.err.required'
   return errors
 }
 
@@ -161,14 +191,17 @@ export type SavePlan = {
   providers: { kind: ProviderKind; update: ProviderUpdate }[]
   keys: { kind: ProviderKind; key: string | null }[]
   settings: SettingsUpdate | null
+  guardrail: Pick<GuardrailRow, 'base_url' | 'model'> | null
+  /** A new guardrail key, null to remove it, undefined to leave it. */
+  guardrailKey?: string | null
 }
 
 const orNull = (s: string) => s.trim() || null
 
-/** What to write for a valid draft. Run order: provider rows, keys, then settings, so a provider switch lands last. */
+/** What to write for a valid draft. Run order: provider rows, keys, guardrail model, then settings, so a provider switch lands last. */
 export function savePlan(saved: Draft, draft: Draft): SavePlan {
   const changed = changes(saved, draft)
-  const plan: SavePlan = { providers: [], keys: [], settings: null }
+  const plan: SavePlan = { providers: [], keys: [], settings: null, guardrail: null }
   for (const kind of PROVIDER_KINDS) {
     const p = draft.providers[kind]
     if (!p) continue
@@ -188,6 +221,12 @@ export function savePlan(saved: Draft, draft: Draft): SavePlan {
     if (p.key.trim()) plan.keys.push({ kind, key: p.key.trim() })
     else if (p.removeKey) plan.keys.push({ kind, key: null })
   }
+  const g = draft.guardrail
+  if (changed.includes('guardrail.base_url') || changed.includes('guardrail.model')) {
+    plan.guardrail = { base_url: g.base_url.trim(), model: g.model.trim() }
+  }
+  if (g.key.trim()) plan.guardrailKey = g.key.trim()
+  else if (g.removeKey) plan.guardrailKey = null
   if (changed.some((path) => path.startsWith('settings.'))) {
     const s = draft.settings
     plan.settings = {

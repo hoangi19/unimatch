@@ -16,6 +16,7 @@ function deps(overrides: Partial<Deps> = {}): Deps & { chatCalls: number } {
     chatCalls: 0,
     getUser: (token: string) => Promise.resolve(token === "admin-token" ? { app_metadata: { role: "admin" } } : token === "user-token" ? { app_metadata: {} } : null),
     loadProvider: () => Promise.resolve(PROVIDER),
+    loadGuardrail: () => Promise.resolve({ ...PROVIDER, kind: "quyet" as const, model: "Quyet-1.0-Large" }),
     chat: () => {
       d.chatCalls++;
       return Promise.resolve<ChatResult>({ text: "OK", model: "hermes-4-70b", usage: { inputTokens: 5, outputTokens: 1 }, latencyMs: 42 });
@@ -81,3 +82,29 @@ Deno.test("unexpected errors are 500 with a generic message", async () => {
   }
 });
 
+
+Deno.test("quyet: returns the decision for the admin's text, or for a sample when none is given", async () => {
+  const seen: string[] = [];
+  const d = deps({
+    chat: (_c, messages) => {
+      seen.push(messages[0].content);
+      return Promise.resolve<ChatResult>({ text: "B", model: "Quyet-1.0-Large", usage: { inputTokens: 90, outputTokens: 1 }, latencyMs: 700 });
+    },
+  });
+  const res = await handle(post("admin-token", { kind: "quyet", text: "Dịch vụ quá tệ" }), d);
+  assertEquals(await res.json(), { ok: true, decision: "complaint", model: "Quyet-1.0-Large", latencyMs: 700 });
+  assertEquals(seen[0].includes("Dịch vụ quá tệ"), true);
+  assertEquals((await (await handle(post("admin-token", { kind: "quyet" }), d)).json()).ok, true);
+});
+
+Deno.test("quyet: bad text is 400; a missing key or a non-letter answer is a typed error", async () => {
+  for (const text of ["", "  ", "x".repeat(2001), 5]) {
+    assertEquals((await handle(post("admin-token", { kind: "quyet", text }), deps())).status, 400);
+  }
+  const noKey = deps({ loadGuardrail: () => Promise.reject(new AiError("bad_config", "No API key saved for the guardrail model")) });
+  assertEquals((await (await handle(post("admin-token", { kind: "quyet" }), noKey)).json()).error.kind, "bad_config");
+  const odd = deps({
+    chat: () => Promise.resolve<ChatResult>({ text: "<", model: "m", usage: { inputTokens: 1, outputTokens: 1 }, latencyMs: 1 }),
+  });
+  assertEquals((await (await handle(post("admin-token", { kind: "quyet" }), odd)).json()).error.kind, "provider");
+});

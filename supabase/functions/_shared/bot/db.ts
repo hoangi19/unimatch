@@ -1,10 +1,11 @@
 // Supabase adapter for the reply engine. `db` must be the service-role client.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 import { chat } from "../ai/chat.ts";
-import { loadProvider } from "../ai/config.ts";
+import { loadGuardrail, loadProvider } from "../ai/config.ts";
+import { decide } from "../ai/quyet.ts";
 import { messengerDeps } from "../messenger/db.ts";
 import { sendText } from "../messenger/send.ts";
-import { type Deps, HISTORY_LIMIT, type Page } from "./engine.ts";
+import { type Deps, guardrailState, HISTORY_LIMIT, type Page } from "./engine.ts";
 
 export function botDeps(db: SupabaseClient): Deps {
   const messenger = messengerDeps(db);
@@ -55,6 +56,10 @@ export function botDeps(db: SupabaseClient): Deps {
     },
     loadProvider: (kind) => loadProvider(db, kind),
     chat: (config, messages, params) => chat(config, messages, params),
+    guardrail: async (turn) => {
+      const { earlier, latest } = guardrailState(turn);
+      return decide(chat, await loadGuardrail(db), earlier, latest);
+    },
     sendText: (pageId, psid, text, sender) => sendText(messenger, pageId, psid, text, sender),
     handOff: async (conversationId, reason, detail) => {
       const { error } = await db.rpc("hand_off_conversation", {

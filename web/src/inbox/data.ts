@@ -150,7 +150,7 @@ export function mergeMessages(current: MessageRow[], incoming: MessageRow[]): Me
 }
 
 export const EVENT_CODES = ['handoff', 'takeover', 'return_to_bot', 'close', 'reopen'] as const
-export const EVENT_REASONS = ['keyword', 'send_failed', 'bot_error', 'low_confidence', 'complaint'] as const
+export const EVENT_REASONS = ['keyword', 'send_failed', 'bot_error', 'low_confidence', 'complaint', 'human_request'] as const
 export type SystemEvent = {
   code: (typeof EVENT_CODES)[number] | 'other'
   reason?: (typeof EVENT_REASONS)[number] | 'other'

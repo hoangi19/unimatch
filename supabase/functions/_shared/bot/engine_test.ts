@@ -1,7 +1,19 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.6";
 import { AiError, type ChatMessage, type ProviderConfig } from "../ai/chat.ts";
 import type { Sender, SendResult } from "../messenger/send.ts";
-import { buildPrompt, DEBOUNCE_MS, type Deps, hoursDecision, matchKeyword, type Page, runBot, type Settings, type Turn } from "./engine.ts";
+import type { Decided } from "../ai/quyet.ts";
+import {
+  buildPrompt,
+  DEBOUNCE_MS,
+  type Deps,
+  guardrailState,
+  hoursDecision,
+  matchKeyword,
+  type Page,
+  runBot,
+  type Settings,
+  type Turn,
+} from "./engine.ts";
 
 const SETTINGS: Settings = {
   active_provider: "openai",
@@ -270,12 +282,126 @@ Deno.test("no keyword handoff when the guardrail is off, the bot is off, a perso
     }
   }));
 
-Deno.test("detectHandoff hook only counts when its guardrail is on", () =>
+const MODEL_ON: Settings["guardrails"] = {
+  handoff_on_keyword: true,
+  model_enabled: true,
+  handoff_on_complaint: true,
+  handoff_on_human_request: true,
+  refuse_off_topic: true,
+  off_topic_message: "Jobs only, sorry.",
+};
+const withGuardrails = (guardrails: Settings["guardrails"]) => ({ settings: { ...SETTINGS, guardrails } });
+const traceOf = (s: Sent) => (s.sender as { trace: Record<string, unknown> }).trace;
+const decided = (decision: Decided["decision"]) => () => Promise.resolve({ decision, model: "Quyet-1.0-Large", latencyMs: 300 });
+
+Deno.test("guardrail complaint and human request hand off with the decision in the trace", () =>
   quiet(async () => {
-    for (const [on, expected] of [[true, ["complaint"]], [false, []]] as const) {
-      const f = fake({ turn: { settings: { ...SETTINGS, guardrails: { handoff_on_complaint: on, handoff_on_low_confidence: true } } } });
-      f.deps.detectHandoff = () => Promise.resolve("complaint");
+    for (const decision of ["complaint", "human_request"] as const) {
+      const f = fake({ turn: withGuardrails(MODEL_ON) });
+      f.deps.guardrail = decided(decision);
       await runBot(f.deps, "p1", "u1", 1);
-      assertEquals(f.handoffs, [...expected]);
+      assertEquals(f.handoffs, [decision]);
+      assertEquals(f.prompts.length, 0);
+      assertEquals(f.sent.map((s) => s.text), ["A teammate will reply soon."]);
+      assertEquals(traceOf(f.sent[0]).guardrail, { model: "Quyet-1.0-Large", decision, latencyMs: 300 });
     }
   }));
+
+Deno.test("guardrail off-topic sends the off-topic message without calling the reply model", () =>
+  quiet(async () => {
+    const f = fake({ turn: withGuardrails(MODEL_ON) });
+    f.deps.guardrail = decided("off_topic_or_abuse");
+    await runBot(f.deps, "p1", "u1", 1);
+    assertEquals(f.handoffs, []);
+    assertEquals(f.prompts.length, 0);
+    assertEquals(f.sent.map((s) => s.text), ["Jobs only, sorry."]);
+    assertEquals(traceOf(f.sent[0]).refused, "off_topic_or_abuse");
+    assertEquals((traceOf(f.sent[0]).guardrail as { decision: string }).decision, "off_topic_or_abuse");
+  }));
+
+Deno.test("guardrail: normal or a decision whose check is off replies as usual, with the decision traced", () =>
+  quiet(async () => {
+    const cases = [
+      ["normal", MODEL_ON],
+      ["complaint", { ...MODEL_ON, handoff_on_complaint: false }],
+      ["human_request", { ...MODEL_ON, handoff_on_human_request: false }],
+      ["off_topic_or_abuse", { ...MODEL_ON, refuse_off_topic: false }],
+    ] as const;
+    for (const [decision, guardrails] of cases) {
+      const f = fake({ turn: withGuardrails(guardrails) });
+      f.deps.guardrail = decided(decision);
+      await runBot(f.deps, "p1", "u1", 1);
+      assertEquals(f.handoffs, []);
+      assertEquals(f.sent.map((s) => s.text), ["Hello!"]);
+      assertEquals((traceOf(f.sent[0]).guardrail as { decision: string }).decision, decision);
+    }
+  }));
+
+Deno.test("guardrail is not called when the model is off, every check is off, or a keyword matched", () =>
+  quiet(async () => {
+    const cases = [
+      fake({ turn: withGuardrails({ ...MODEL_ON, model_enabled: false }) }),
+      fake({ turn: withGuardrails({ ...MODEL_ON, handoff_on_complaint: false, handoff_on_human_request: false, refuse_off_topic: false }) }),
+      fake({ page: { handoff_keywords: ["nhan vien"] }, turn: { ...KEYWORD_TURN, ...withGuardrails(MODEL_ON) } }),
+    ];
+    for (const f of cases) {
+      let calls = 0;
+      f.deps.guardrail = () => (calls++, decided("complaint")());
+      await runBot(f.deps, "p1", "u1", 1);
+      assertEquals(calls, 0);
+      assertEquals(f.sent.every((s) => traceOf(s).guardrail === undefined), true);
+    }
+  }));
+
+Deno.test("guardrail failure fails open by default and hands off when set to", () =>
+  quiet(async () => {
+    const open = fake({ turn: withGuardrails(MODEL_ON) });
+    open.deps.guardrail = () => Promise.reject(new AiError("timeout", "slow"));
+    await runBot(open.deps, "p1", "u1", 1);
+    assertEquals(open.handoffs, []);
+    assertEquals(open.sent.map((s) => s.text), ["Hello!"]);
+    assertEquals(traceOf(open.sent[0]).guardrail, { decision: "error", error: "timeout" });
+
+    const closed = fake({ turn: withGuardrails({ ...MODEL_ON, on_model_error: "handoff" }) });
+    closed.deps.guardrail = () => Promise.reject(new AiError("provider", "bad letter"));
+    await runBot(closed.deps, "p1", "u1", 1);
+    assertEquals(closed.handoffs, [["bot_error", { guardrail_error: "provider" }]]);
+    assertEquals(closed.prompts.length, 0);
+  }));
+
+Deno.test("guardrail logs the decision only, never the customer text", async () => {
+  const lines: string[] = [];
+  const { log, error } = console;
+  console.log = console.error = (...args: unknown[]) => lines.push(args.join(" "));
+  try {
+    const f = fake({ turn: { ...withGuardrails(MODEL_ON), newCustomerTexts: ["secret complaint text"] } });
+    f.deps.guardrail = decided("normal");
+    await runBot(f.deps, "p1", "u1", 1);
+    const failing = fake({ turn: { ...withGuardrails(MODEL_ON), newCustomerTexts: ["secret complaint text"] } });
+    failing.deps.guardrail = () => Promise.reject(new AiError("auth", "rejected"));
+    await runBot(failing.deps, "p1", "u1", 1);
+  } finally {
+    Object.assign(console, { log, error });
+  }
+  const guardrailLines = lines.filter((l) => l.includes('"event":"guardrail"'));
+  assertEquals(guardrailLines.length, 2);
+  assertEquals(lines.some((l) => l.includes("secret complaint text")), false);
+});
+
+Deno.test("guardrailState: earlier messages without the texts this turn answers; staff counts as the bot side", () => {
+  const turn = {
+    history: [
+      { sender_kind: "user", text: "hi" },
+      { sender_kind: "bot", text: "hello" },
+      { sender_kind: "system", text: null },
+      { sender_kind: "admin", text: "staff here" },
+      { sender_kind: "user", text: "first" },
+      { sender_kind: "user", text: "second" },
+    ],
+    newCustomerTexts: ["first", "second"],
+  } as Turn;
+  assertEquals(guardrailState(turn), {
+    earlier: [{ from: "customer", text: "hi" }, { from: "bot", text: "hello" }, { from: "bot", text: "staff here" }],
+    latest: ["first", "second"],
+  });
+});

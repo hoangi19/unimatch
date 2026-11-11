@@ -31,3 +31,14 @@ export async function loadKey(db: SupabaseClient, kind: ProviderKind): Promise<s
   if (!apiKey) throw new AiError("bad_config", "No API key saved for this provider");
   return apiKey;
 }
+
+// The guardrail model's connection (guardrail_model row) and its own Vault key; bad_config when no key is saved.
+export async function loadGuardrail(db: SupabaseClient): Promise<ProviderConfig> {
+  const { data: row, error } = await db.from("guardrail_model").select("base_url, model").single();
+  if (error) throw new Error("could not load the guardrail model");
+  await assertPublicHost(row.base_url);
+  const { data: apiKey, error: keyError } = await db.rpc("get_guardrail_key");
+  if (keyError) throw new Error("could not read the guardrail key");
+  if (!apiKey) throw new AiError("bad_config", "No API key saved for the guardrail model");
+  return { kind: "quyet", baseUrl: row.base_url, model: row.model, apiKey, extraHeaders: {}, supportsTools: false };
+}

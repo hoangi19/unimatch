@@ -17,6 +17,7 @@ function setup(result: TestChatResult = REPLY, draft: Draft = toDraft(SAVED)) {
     load: vi.fn(),
     save: vi.fn(),
     testConnection: vi.fn(),
+    testGuardrail: vi.fn(),
     loadPages: vi.fn(async () => [{ id: 'p1', name: 'UniMatch', handoff_keywords: ['gap nguoi that'] }]),
     testChat: vi.fn(async () => result),
   }
