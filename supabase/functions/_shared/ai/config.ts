@@ -12,16 +12,20 @@ export async function loadProvider(db: SupabaseClient, kind: ProviderKind): Prom
   if (!row) throw new AiError("bad_config", `Unknown provider: ${kind}`);
   if (!row.base_url || !row.model) throw new AiError("bad_config", "Set a base URL and a model for this provider first");
 
-  const { data: apiKey, error: keyError } = await db.rpc("get_provider_key", { p_kind: kind });
-  if (keyError) throw new Error(`could not read the key for provider ${kind}`);
-  if (!apiKey) throw new AiError("bad_config", "No API key saved for this provider");
-
   return {
     kind,
     baseUrl: row.base_url,
     model: row.model,
-    apiKey,
+    apiKey: await loadKey(db, kind),
     extraHeaders: row.extra_headers ?? {},
     supportsTools: row.supports_tools,
   };
+}
+
+// The provider's Vault key; bad_config when none is saved.
+export async function loadKey(db: SupabaseClient, kind: ProviderKind): Promise<string> {
+  const { data: apiKey, error } = await db.rpc("get_provider_key", { p_kind: kind });
+  if (error) throw new Error(`could not read the key for provider ${kind}`);
+  if (!apiKey) throw new AiError("bad_config", "No API key saved for this provider");
+  return apiKey;
 }

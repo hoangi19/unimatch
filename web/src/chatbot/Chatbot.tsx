@@ -5,6 +5,7 @@ import { Icon, type IconName } from '../ui/Icon'
 import { useToast } from '../ui/toast-context'
 import type { ChatbotApi, TestResult } from './api'
 import './chatbot.css'
+import { TestChat } from './TestChat'
 import {
   changes,
   EDITABLE_URL,
@@ -194,218 +195,221 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
           <p className="sub">{t('chatbot.sub')}</p>
         </div>
       </div>
-      <div className="bot-config">
-        <Card icon="bot" title={t('chatbot.ai.title')} sub={t('chatbot.ai.sub')}>
-          <fieldset className="plain">
-            <legend className="label">{t('chatbot.ai.pick')}</legend>
-            <div className="prov-grid">
-              {PROVIDER_KINDS.map((kind) => (
-                <label key={kind} className="prov">
-                  <input
-                    type="radio"
-                    name="cb-provider"
-                    value={kind}
-                    checked={active === kind}
-                    onChange={() => setSettings({ active_provider: kind })}
-                  />
-                  <span className="prov-txt">
-                    <strong>{providerName(kind)}</strong>
-                    <span>{t(`chatbot.vendor.${kind}`)}</span>
-                  </span>
-                  {rows[kind]?.key_hint && (
-                    <span className="prov-key" title={t('chatbot.key.label')}>
-                      <Icon name="key" />
+      <div className="bot-layout">
+        <div className="bot-config">
+          <Card icon="bot" title={t('chatbot.ai.title')} sub={t('chatbot.ai.sub')}>
+            <fieldset className="plain">
+              <legend className="label">{t('chatbot.ai.pick')}</legend>
+              <div className="prov-grid">
+                {PROVIDER_KINDS.map((kind) => (
+                  <label key={kind} className="prov">
+                    <input
+                      type="radio"
+                      name="cb-provider"
+                      value={kind}
+                      checked={active === kind}
+                      onChange={() => setSettings({ active_provider: kind })}
+                    />
+                    <span className="prov-txt">
+                      <strong>{providerName(kind)}</strong>
+                      <span>{t(`chatbot.vendor.${kind}`)}</span>
                     </span>
-                  )}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+                    {rows[kind]?.key_hint && (
+                      <span className="prov-key" title={t('chatbot.key.label')}>
+                        <Icon name="key" />
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
-          <div className="prov-fields" key={active}>
-            {active === 'custom' && (
-              <Input
-                id={fieldId('custom.display_name')}
-                label={t('chatbot.ai.name')}
-                placeholder={t('chatbot.ai.namePh')}
-                value={p.display_name}
-                onChange={(e) => setProvider(active, { display_name: e.target.value })}
-              />
-            )}
-            {EDITABLE_URL.has(active) ? (
+            <div className="prov-fields" key={active}>
+              {active === 'custom' && (
+                <Input
+                  id={fieldId('custom.display_name')}
+                  label={t('chatbot.ai.name')}
+                  placeholder={t('chatbot.ai.namePh')}
+                  value={p.display_name}
+                  onChange={(e) => setProvider(active, { display_name: e.target.value })}
+                />
+              )}
+              {EDITABLE_URL.has(active) ? (
+                <div className="field">
+                  <Input
+                    id={fieldId(`${active}.base_url`)}
+                    className="input mono"
+                    label={t('chatbot.ai.baseUrl')}
+                    placeholder="https://llm.example.com/v1"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={p.base_url}
+                    error={err(`${active}.base_url`)}
+                    hint={t('chatbot.ai.baseUrlHint')}
+                    onChange={(e) => setProvider(active, { base_url: e.target.value })}
+                  />
+                  {active === 'hermes' && (
+                    <Examples
+                      items={HERMES_URLS.map(([label, url]) => ({ label: t(label), value: url }))}
+                      current={p.base_url}
+                      onPick={(base_url) => setProvider(active, { base_url })}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="field">
+                  <span className="label">{t('chatbot.ai.baseUrl')}</span>
+                  <div className="input mono readonly-box">{p.base_url}</div>
+                </div>
+              )}
               <div className="field">
                 <Input
-                  id={fieldId(`${active}.base_url`)}
+                  id={fieldId(`${active}.model`)}
                   className="input mono"
-                  label={t('chatbot.ai.baseUrl')}
-                  placeholder="https://llm.example.com/v1"
+                  label={t('chatbot.ai.model')}
+                  placeholder={active === 'custom' ? 'qwen2.5-72b-instruct' : undefined}
                   autoComplete="off"
                   spellCheck={false}
-                  value={p.base_url}
-                  error={err(`${active}.base_url`)}
-                  hint={t('chatbot.ai.baseUrlHint')}
-                  onChange={(e) => setProvider(active, { base_url: e.target.value })}
+                  value={p.model}
+                  error={err(`${active}.model`)}
+                  hint={MODEL_EXAMPLES[active].length ? t('chatbot.ai.examplesHint') : undefined}
+                  onChange={(e) => setProvider(active, { model: e.target.value })}
                 />
-                {active === 'hermes' && (
-                  <Examples
-                    items={HERMES_URLS.map(([label, url]) => ({ label: t(label), value: url }))}
-                    current={p.base_url}
-                    onPick={(base_url) => setProvider(active, { base_url })}
-                  />
-                )}
+                <Examples
+                  items={MODEL_EXAMPLES[active].map((m) => ({ label: m, value: m }))}
+                  current={p.model}
+                  onPick={(model) => setProvider(active, { model })}
+                  mono
+                />
               </div>
-            ) : (
-              <div className="field">
-                <span className="label">{t('chatbot.ai.baseUrl')}</span>
-                <div className="input mono readonly-box">{p.base_url}</div>
+              <KeyField
+                key={rows[active]?.key_saved_at ?? 'none'}
+                id={fieldId(`${active}.key`)}
+                row={rows[active]}
+                form={p}
+                error={err(`${active}.key`)}
+                onChange={(patch) => setProvider(active, patch)}
+              />
+              {active === 'custom' && (
+                <>
+                  <Headers form={p} errors={errors} onChange={(headers) => setProvider(active, { headers })} />
+                  <label className="check">
+                    <input type="checkbox" checked={p.supports_tools} onChange={(e) => setProvider(active, { supports_tools: e.target.checked })} />
+                    <span>
+                      <span className="check-title">{t('chatbot.ai.tools')}</span>
+                      <br />
+                      <span className="hint">{t('chatbot.ai.toolsHint')}</span>
+                    </span>
+                  </label>
+                  {!p.supports_tools && (
+                    <div className="callout callout-warning" role="status">
+                      <Icon name="alert" />
+                      <div className="callout-body">{t('chatbot.ai.toolsOff')}</div>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="conn-row">
+                <Button icon={conn[active]?.status === 'loading' ? undefined : 'sparkles'} disabled={conn[active]?.status === 'loading'} onClick={() => void test(active)}>
+                  {conn[active]?.status === 'loading' && <Spinner />}
+                  {t('chatbot.conn.test')}
+                </Button>
+                <span aria-live="polite">
+                  <ConnStatus conn={conn[active]} />
+                </span>
               </div>
-            )}
-            <div className="field">
-              <Input
-                id={fieldId(`${active}.model`)}
-                className="input mono"
-                label={t('chatbot.ai.model')}
-                placeholder={active === 'custom' ? 'qwen2.5-72b-instruct' : undefined}
-                autoComplete="off"
-                spellCheck={false}
-                value={p.model}
-                error={err(`${active}.model`)}
-                hint={MODEL_EXAMPLES[active].length ? t('chatbot.ai.examplesHint') : undefined}
-                onChange={(e) => setProvider(active, { model: e.target.value })}
-              />
-              <Examples
-                items={MODEL_EXAMPLES[active].map((m) => ({ label: m, value: m }))}
-                current={p.model}
-                onPick={(model) => setProvider(active, { model })}
-                mono
-              />
+              {dirty && <p className="hint">{t('chatbot.conn.savedOnly')}</p>}
             </div>
-            <KeyField
-              key={rows[active]?.key_saved_at ?? 'none'}
-              id={fieldId(`${active}.key`)}
-              row={rows[active]}
-              form={p}
-              error={err(`${active}.key`)}
-              onChange={(patch) => setProvider(active, patch)}
-            />
-            {active === 'custom' && (
-              <>
-                <Headers form={p} errors={errors} onChange={(headers) => setProvider(active, { headers })} />
-                <label className="check">
-                  <input type="checkbox" checked={p.supports_tools} onChange={(e) => setProvider(active, { supports_tools: e.target.checked })} />
-                  <span>
-                    <span className="check-title">{t('chatbot.ai.tools')}</span>
-                    <br />
-                    <span className="hint">{t('chatbot.ai.toolsHint')}</span>
-                  </span>
-                </label>
-                {!p.supports_tools && (
-                  <div className="callout callout-warning" role="status">
-                    <Icon name="alert" />
-                    <div className="callout-body">{t('chatbot.ai.toolsOff')}</div>
-                  </div>
-                )}
-              </>
-            )}
-            <div className="conn-row">
-              <Button icon={conn[active]?.status === 'loading' ? undefined : 'sparkles'} disabled={conn[active]?.status === 'loading'} onClick={() => void test(active)}>
-                {conn[active]?.status === 'loading' && <Spinner />}
-                {t('chatbot.conn.test')}
-              </Button>
-              <span aria-live="polite">
-                <ConnStatus conn={conn[active]} />
-              </span>
-            </div>
-            {dirty && <p className="hint">{t('chatbot.conn.savedOnly')}</p>}
-          </div>
-        </Card>
+          </Card>
 
-        <Card icon="sparkles" title={t('chatbot.gen.title')}>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor={fieldId('settings.temperature')}>{t('chatbot.gen.temp')}</label>
-              <div className="range-row">
-                <input
-                  id={fieldId('settings.temperature')}
-                  type="range"
-                  min={TEMPERATURE.min}
-                  max={TEMPERATURE.max}
-                  step={TEMPERATURE.step}
-                  value={s.temperature}
-                  aria-describedby={fieldId('settings.temperature') + '-note'}
-                  onChange={(e) => setSettings({ temperature: Number(e.target.value) })}
-                />
-                <output htmlFor={fieldId('settings.temperature')}>{s.temperature.toFixed(1)}</output>
+          <Card icon="sparkles" title={t('chatbot.gen.title')}>
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor={fieldId('settings.temperature')}>{t('chatbot.gen.temp')}</label>
+                <div className="range-row">
+                  <input
+                    id={fieldId('settings.temperature')}
+                    type="range"
+                    min={TEMPERATURE.min}
+                    max={TEMPERATURE.max}
+                    step={TEMPERATURE.step}
+                    value={s.temperature}
+                    aria-describedby={fieldId('settings.temperature') + '-note'}
+                    onChange={(e) => setSettings({ temperature: Number(e.target.value) })}
+                  />
+                  <output htmlFor={fieldId('settings.temperature')}>{s.temperature.toFixed(1)}</output>
+                </div>
+                <div className="range-scale" aria-hidden="true">
+                  <span>{t('chatbot.gen.precise')}</span>
+                  <span>{t('chatbot.gen.creative')}</span>
+                </div>
+                <p className="hint" id={fieldId('settings.temperature') + '-note'}>
+                  {USES_TEMPERATURE.has(active) ? t('chatbot.gen.tempHint') : t('chatbot.gen.tempIgnored', { name: providerName(active) })}
+                </p>
               </div>
-              <div className="range-scale" aria-hidden="true">
-                <span>{t('chatbot.gen.precise')}</span>
-                <span>{t('chatbot.gen.creative')}</span>
-              </div>
-              <p className="hint" id={fieldId('settings.temperature') + '-note'}>
-                {USES_TEMPERATURE.has(active) ? t('chatbot.gen.tempHint') : t('chatbot.gen.tempIgnored', { name: providerName(active) })}
-              </p>
+              <Input
+                id={fieldId('settings.max_tokens')}
+                type="number"
+                inputMode="numeric"
+                min={MAX_TOKENS_MIN}
+                step={64}
+                label={t('chatbot.gen.maxTokens')}
+                value={s.max_tokens}
+                error={err('settings.max_tokens')}
+                hint={t('chatbot.gen.maxTokensHint', { min: MAX_TOKENS_MIN })}
+                onChange={(e) => setSettings({ max_tokens: e.target.value })}
+              />
             </div>
+          </Card>
+
+          <Card icon="bot" title={t('chatbot.prompt.title')} sub={t('chatbot.prompt.sub')}>
+            <SystemPrompt value={s.system_prompt} error={err('settings.system_prompt')} onChange={(system_prompt) => setSettings({ system_prompt })} />
+            <Area path="settings.greeting" label={t('chatbot.prompt.greeting')} hint={t('chatbot.prompt.greetingHint')} value={s.greeting} error={err('settings.greeting')} onChange={(greeting) => setSettings({ greeting })} />
+            <Area path="settings.fallback" label={t('chatbot.prompt.fallback')} hint={t('chatbot.prompt.fallbackHint')} value={s.fallback} error={err('settings.fallback')} onChange={(fallback) => setSettings({ fallback })} />
+            <fieldset className="plain field">
+              <legend className="label">{t('chatbot.prompt.lang')}</legend>
+              <div className="segmented">
+                {LANGUAGES.map((lang) => (
+                  <label key={lang}>
+                    <input type="radio" name="cb-language" value={lang} checked={s.language === lang} onChange={() => setSettings({ language: lang })} />
+                    <span>{t(`chatbot.lang.${lang}`)}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </Card>
+
+          <Card icon="shield" title={t('chatbot.guard.title')} sub={t('chatbot.guard.sub')}>
+            <Topics topics={s.guardrails.refused_topics} onChange={(refused_topics) => setGuardrails({ refused_topics })} />
             <Input
-              id={fieldId('settings.max_tokens')}
+              id={fieldId('settings.rate_limit_per_hour')}
               type="number"
               inputMode="numeric"
-              min={MAX_TOKENS_MIN}
-              step={64}
-              label={t('chatbot.gen.maxTokens')}
-              value={s.max_tokens}
-              error={err('settings.max_tokens')}
-              hint={t('chatbot.gen.maxTokensHint', { min: MAX_TOKENS_MIN })}
-              onChange={(e) => setSettings({ max_tokens: e.target.value })}
+              min={RATE_LIMIT.min}
+              max={RATE_LIMIT.max}
+              label={t('chatbot.guard.rate')}
+              value={s.rate_limit_per_hour}
+              error={err('settings.rate_limit_per_hour')}
+              hint={t('chatbot.guard.rateHint')}
+              onChange={(e) => setSettings({ rate_limit_per_hour: e.target.value })}
             />
-          </div>
-        </Card>
-
-        <Card icon="bot" title={t('chatbot.prompt.title')} sub={t('chatbot.prompt.sub')}>
-          <SystemPrompt value={s.system_prompt} error={err('settings.system_prompt')} onChange={(system_prompt) => setSettings({ system_prompt })} />
-          <Area path="settings.greeting" label={t('chatbot.prompt.greeting')} hint={t('chatbot.prompt.greetingHint')} value={s.greeting} error={err('settings.greeting')} onChange={(greeting) => setSettings({ greeting })} />
-          <Area path="settings.fallback" label={t('chatbot.prompt.fallback')} hint={t('chatbot.prompt.fallbackHint')} value={s.fallback} error={err('settings.fallback')} onChange={(fallback) => setSettings({ fallback })} />
-          <fieldset className="plain field">
-            <legend className="label">{t('chatbot.prompt.lang')}</legend>
-            <div className="segmented">
-              {LANGUAGES.map((lang) => (
-                <label key={lang}>
-                  <input type="radio" name="cb-language" value={lang} checked={s.language === lang} onChange={() => setSettings({ language: lang })} />
-                  <span>{t(`chatbot.lang.${lang}`)}</span>
+            <fieldset className="plain field">
+              <legend className="label">{t('chatbot.guard.handoff')}</legend>
+              {HANDOFF_RULES.map((rule) => (
+                <label key={rule} className="check">
+                  <input type="checkbox" checked={s.guardrails[rule]} onChange={(e) => setGuardrails({ [rule]: e.target.checked })} />
+                  <span>
+                    <span className="check-title">{t(`chatbot.guard.${rule}`)}</span>
+                    <br />
+                    <span className="hint">{t(`chatbot.guard.${rule}.hint`)}</span>
+                  </span>
                 </label>
               ))}
-            </div>
-          </fieldset>
-        </Card>
-
-        <Card icon="shield" title={t('chatbot.guard.title')} sub={t('chatbot.guard.sub')}>
-          <Topics topics={s.guardrails.refused_topics} onChange={(refused_topics) => setGuardrails({ refused_topics })} />
-          <Input
-            id={fieldId('settings.rate_limit_per_hour')}
-            type="number"
-            inputMode="numeric"
-            min={RATE_LIMIT.min}
-            max={RATE_LIMIT.max}
-            label={t('chatbot.guard.rate')}
-            value={s.rate_limit_per_hour}
-            error={err('settings.rate_limit_per_hour')}
-            hint={t('chatbot.guard.rateHint')}
-            onChange={(e) => setSettings({ rate_limit_per_hour: e.target.value })}
-          />
-          <fieldset className="plain field">
-            <legend className="label">{t('chatbot.guard.handoff')}</legend>
-            {HANDOFF_RULES.map((rule) => (
-              <label key={rule} className="check">
-                <input type="checkbox" checked={s.guardrails[rule]} onChange={(e) => setGuardrails({ [rule]: e.target.checked })} />
-                <span>
-                  <span className="check-title">{t(`chatbot.guard.${rule}`)}</span>
-                  <br />
-                  <span className="hint">{t(`chatbot.guard.${rule}.hint`)}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-          <Area path="settings.handoff_message" label={t('chatbot.guard.handoffMsg')} value={s.handoff_message} error={err('settings.handoff_message')} onChange={(handoff_message) => setSettings({ handoff_message })} />
-        </Card>
+            </fieldset>
+            <Area path="settings.handoff_message" label={t('chatbot.guard.handoffMsg')} value={s.handoff_message} error={err('settings.handoff_message')} onChange={(handoff_message) => setSettings({ handoff_message })} />
+          </Card>
+        </div>
+        <TestChat api={api} draft={draft} dirty={dirty} />
       </div>
 
       <div className={dirty ? 'savebar show' : 'savebar'} role="region" aria-label={t('chatbot.save.region')} hidden={!dirty}>

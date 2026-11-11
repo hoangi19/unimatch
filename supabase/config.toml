@@ -345,6 +345,10 @@ verify_jwt = false
 # Gateway JWT checks are unreliable with the new API keys; the function verifies the caller with auth.getUser().
 verify_jwt = false
 
+[functions.test-chat]
+# Same as test-connection: the function verifies the admin caller with auth.getUser().
+verify_jwt = false
+
 [functions.send-message]
 # Same as test-connection: the function verifies the admin caller with auth.getUser().
 verify_jwt = false

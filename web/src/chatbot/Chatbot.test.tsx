@@ -25,6 +25,8 @@ function stubApi(first: Saved = SAVED) {
       }
     }),
     testConnection: vi.fn(async () => ({ ok: false as const, error: { kind: 'bad_config' as const, message: 'No API key' } })),
+    loadPages: vi.fn(async () => []),
+    testChat: vi.fn(async () => ({ ok: false as const, error: { kind: 'bad_config' as const, message: 'No API key' } })),
   }
   return api
 }

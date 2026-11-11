@@ -116,14 +116,17 @@ export function matchKeyword(texts: string[], keywords: string[]): string | null
   return keywords.find((k) => normalize(k) && haystack.includes(` ${normalize(k)} `)) ?? null;
 }
 
+// The keyword guardrail alone; shared with the test-chat dry run.
+export function keywordHandoff(guardrails: Settings["guardrails"], texts: string[], keywords: string[]): string | null {
+  return guardrails.handoff_on_keyword ? matchKeyword(texts, keywords) : null;
+}
+
 // Runs before the hours and rate-limit checks: a request for a person is always flagged.
 async function detectHandoff(deps: Deps, page: Page, turn: Turn): Promise<{ reason: HandoffReason; detail?: Record<string, unknown> } | null> {
   if (!page.bot_enabled || turn.conversation.status !== "bot") return null;
   const { guardrails } = turn.settings;
-  if (guardrails.handoff_on_keyword) {
-    const keyword = matchKeyword(turn.newCustomerTexts, page.handoff_keywords ?? []);
-    if (keyword) return { reason: "keyword", detail: { keyword } };
-  }
+  const keyword = keywordHandoff(guardrails, turn.newCustomerTexts, page.handoff_keywords ?? []);
+  if (keyword) return { reason: "keyword", detail: { keyword } };
   if (deps.detectHandoff && (guardrails.handoff_on_low_confidence || guardrails.handoff_on_complaint)) {
     const reason = await deps.detectHandoff(turn);
     if (reason && guardrails[`handoff_on_${reason}`]) return { reason };
@@ -177,6 +180,24 @@ export function buildPrompt(settings: Settings, pageName: string, history: Histo
   return [{ role: "system", content: system }, ...turns];
 }
 
+export type Generated = { text: string; model: string; latencyMs: number; tokens: ChatResult["usage"] };
+
+// Prompt + provider call + reply cleanup; shared with the test-chat dry run. Throws AiError on an empty reply.
+export async function generate(
+  chat: Deps["chat"],
+  config: ProviderConfig,
+  settings: Settings,
+  pageName: string,
+  history: HistoryMessage[],
+): Promise<Generated> {
+  const result = await chat(config, buildPrompt(settings, pageName, history), {
+    maxTokens: settings.max_tokens, temperature: Number(settings.temperature),
+  });
+  const text = result.text.trim().slice(0, MAX_TEXT);
+  if (!text) throw new AiError("provider", "Provider returned an empty reply");
+  return { text, model: result.model, latencyMs: result.latencyMs, tokens: result.usage };
+}
+
 function log(fields: Record<string, unknown>) {
   console.log(JSON.stringify({ event: "bot_turn", ...fields }));
 }
@@ -203,12 +224,9 @@ async function reply(deps: Deps, page: Page, psid: string, conversationId: strin
   try {
     const config = await deps.loadProvider(settings.active_provider);
     trace.model = config.model;
-    const result = await deps.chat(config, buildPrompt(settings, page.name, turn.history), {
-      maxTokens: settings.max_tokens, temperature: Number(settings.temperature),
-    });
-    Object.assign(trace, { model: result.model, latencyMs: result.latencyMs, tokens: result.usage });
-    text = result.text.trim().slice(0, MAX_TEXT);
-    if (!text) throw new AiError("provider", "Provider returned an empty reply");
+    const { text: reply, ...rest } = await generate(deps.chat, config, settings, page.name, turn.history);
+    Object.assign(trace, rest);
+    text = reply;
   } catch (e) {
     failure = e instanceof AiError ? e.kind : "internal";
     console.error("bot: provider failed", failure, e instanceof Error ? e.message : "");
