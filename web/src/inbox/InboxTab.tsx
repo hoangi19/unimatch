@@ -16,6 +16,7 @@ import {
 } from './data'
 import { Composer } from './Composer'
 import { CustomerInfo } from './CustomerInfo'
+import { InboxStats } from './InboxStats'
 import { Avatar, StatusBadge, Thread } from './Thread'
 import { useWide } from './useWide'
 import './inbox.css'
@@ -135,6 +136,7 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
 
   return (
     <div className="inbox">
+      <InboxStats data={data} pageId={pageId === 'all' ? undefined : pageId} />
       <div className="ib-grid" data-pane={selected ? 'thread' : 'list'}>
         <section className="ib-list" aria-label={t('inbox.list')}>
           <div className="ib-list-head">

@@ -21,6 +21,7 @@ export function liveData(patch: Partial<InboxData> = {}) {
     setMode: vi.fn(async () => {}),
     send: vi.fn(async (): Promise<SendResult> => ({ ok: true, messageId: 'm-sent' })),
     loadQuickReplies: vi.fn(async () => []),
+    loadStats: vi.fn(async () => ({ open_conversations: 0, waiting_for_human: 0, customer_conversations: 0, bot_handled: 0, avg_first_response_seconds: null })),
     ...patch,
   }
   return { data, emit: (event: LiveEvent) => send(event) }
