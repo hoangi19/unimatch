@@ -7,6 +7,8 @@ import { useToast } from '../ui/toast-context'
 import { attachmentTypes, eventText, isStatus, parseEvent, shortTime, type ConversationRow, type InboxData, type MessageRow, type SystemEvent } from './data'
 import { useThread } from './useThread'
 
+const NEAR_BOTTOM = 48
+
 type ThreadProps = {
   data: InboxData
   conversation: ConversationRow
@@ -27,6 +29,10 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
   const heading = useRef<HTMLHeadingElement>(null)
   // scrollHeight before older messages were added, to keep the view still.
   const anchor = useRef<number | null>(null)
+  // Updated on scroll, so it holds the position from before new messages render.
+  const atBottom = useRef(true)
+  const lastId = useRef<string | null>(null)
+  const [newBelow, setNewBelow] = useState(false)
   const name = conversation.customer_name ?? t('inbox.noName')
 
   useEffect(() => {
@@ -37,10 +43,29 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
   useLayoutEffect(() => {
     const el = log.current
     if (!el) return
-    if (anchor.current === null) el.scrollTop = el.scrollHeight
-    else el.scrollTop += el.scrollHeight - anchor.current
+    const last = messages.at(-1)?.id ?? null
+    const appended = lastId.current !== null && last !== lastId.current
+    lastId.current = last
+    if (anchor.current !== null) el.scrollTop += el.scrollHeight - anchor.current
+    else if (atBottom.current) el.scrollTop = el.scrollHeight
+    // Reading older messages: keep the view still and point at what arrived.
+    else if (appended) setNewBelow(true)
     anchor.current = null
   }, [messages])
+
+  const onScroll = () => {
+    const el = log.current
+    if (!el) return
+    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM
+    if (atBottom.current) setNewBelow(false)
+  }
+
+  const toBottom = () => {
+    const el = log.current
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    el?.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' })
+    setNewBelow(false)
+  }
 
   const older = async () => {
     anchor.current = log.current?.scrollHeight ?? null
@@ -77,7 +102,8 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
           </div>
         </div>
       ) : (
-        <ol ref={log} className="ib-log" aria-label={t('inbox.thread', { name })} aria-busy={status === 'loading'}>
+        <div className="ib-log-wrap">
+        <ol ref={log} className="ib-log" aria-label={t('inbox.thread', { name })} aria-busy={status === 'loading'} onScroll={onScroll}>
           {status === 'loading' ? (
             <ThreadSkeleton />
           ) : (
@@ -96,6 +122,15 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
             </>
           )}
         </ol>
+        <div aria-live="polite">
+          {newBelow && (
+            <button type="button" className="ib-pill" onClick={toBottom}>
+              <Icon name="arrow-down" />
+              {t('inboxLive.newMessages')}
+            </button>
+          )}
+        </div>
+        </div>
       )}
       {footer}
       <Drawer open={infoOpen} onClose={() => setInfoOpen(false)} title={t('inbox.details')}>

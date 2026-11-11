@@ -28,7 +28,43 @@ export type InboxData = {
   loadConversations(): Promise<ConversationRow[]>
   /** Up to MESSAGE_PAGE messages older than `before` (newest when omitted), oldest first. */
   loadMessages(conversationId: string, before?: Cursor): Promise<MessageRow[]>
+  /** Conversation ids with unread messages, for the sidebar count. */
+  loadUnread(): Promise<Pick<ConversationRow, 'id' | 'unread_count'>[]>
+  markRead(conversationId: string): Promise<void>
+  /** Live row changes. All listeners share one connection; returns the unsubscribe. */
+  subscribe(listener: LiveListener): () => void
 }
+
+/** `resync`: the connection came back and rows may have been missed, so refetch. */
+export type LiveEvent =
+  | { type: 'conversation'; row: ConversationRow }
+  | { type: 'conversationDeleted'; id: string }
+  | { type: 'message'; row: MessageRow }
+  | { type: 'resync' }
+export type LiveListener = (event: LiveEvent) => void
+
+/** Fans one source out to many listeners: `open` runs with the first listener, its cleanup after the last one leaves. */
+export function createHub(open: (emit: LiveListener) => () => void) {
+  const listeners = new Set<LiveListener>()
+  let close: (() => void) | null = null
+  return (listener: LiveListener) => {
+    listeners.add(listener)
+    close ??= open((event) => listeners.forEach((l) => l(event)))
+    return () => {
+      listeners.delete(listener)
+      if (!listeners.size && close) {
+        close()
+        close = null
+      }
+    }
+  }
+}
+
+/** Replaces the row with the same id, or adds it. */
+export const upsertConversation = (rows: ConversationRow[], row: ConversationRow) => [...rows.filter((r) => r.id !== row.id), row]
+
+/** Sum of unread messages over a map of conversation id to count. */
+export const unreadTotal = (counts: Map<string, number>) => [...counts.values()].reduce((a, b) => a + b, 0)
 
 // shortcut: the list loads at most this many conversations and filters them in the browser; page on the server when a deployment outgrows it.
 export const CONVERSATION_LIMIT = 500

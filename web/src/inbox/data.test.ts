@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { translate } from '../i18n'
 import {
   attachmentTypes,
+  createHub,
   countByFilter,
   eventText,
   matchesSearch,
@@ -9,6 +10,7 @@ import {
   parseEvent,
   shortTime,
   sortConversations,
+  type LiveListener,
 } from './data'
 import { conv, msg } from './fixture'
 
@@ -85,4 +87,25 @@ it('shows a clock time today and a date otherwise', () => {
   expect(shortTime(new Date(2026, 10, 12, 9, 5).toISOString(), 'en-GB', now)).toBe('09:05')
   expect(shortTime(new Date(2026, 10, 3, 9, 5).toISOString(), 'en-GB', now)).toBe('03/11')
   expect(shortTime(new Date(2025, 10, 3, 9, 5).toISOString(), 'en-GB', now)).toBe('03/11/2025')
+})
+
+describe('createHub', () => {
+  it('opens one source for many listeners and closes it after the last one leaves', () => {
+    const close = vi.fn()
+    let send: LiveListener = () => {}
+    const open = vi.fn((emit: LiveListener) => ((send = emit), close))
+    const subscribe = createHub(open)
+    const a = vi.fn()
+    const b = vi.fn()
+    const offA = subscribe(a)
+    const offB = subscribe(b)
+    send({ type: 'resync' })
+    expect([a.mock.calls.length, b.mock.calls.length, open.mock.calls.length]).toEqual([1, 1, 1])
+    offA()
+    expect(close).not.toHaveBeenCalled()
+    offB()
+    expect(close).toHaveBeenCalledOnce()
+    subscribe(a)
+    expect(open).toHaveBeenCalledTimes(2)
+  })
 })

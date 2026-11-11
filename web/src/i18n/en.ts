@@ -359,6 +359,8 @@ export const en = {
   'chatbot.test.tokens': '{in} tokens in · {out} out',
   'chatbot.test.handoff': 'Handed off: keyword “{keyword}”',
   'chatbot.test.noHandoff': 'No handoff',
+  'inboxLive.newMessages': 'New messages',
+  'inboxLive.unreadTotal': '{n} unread messages',
 }
 
 export type MessageKey = keyof typeof en

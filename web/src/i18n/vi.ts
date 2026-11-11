@@ -361,4 +361,6 @@ export const vi: Record<MessageKey, string> = {
   'chatbot.test.tokens': '{in} token vào · {out} ra',
   'chatbot.test.handoff': 'Đã chuyển cho người thật: từ khóa “{keyword}”',
   'chatbot.test.noHandoff': 'Không chuyển cho người thật',
+  'inboxLive.newMessages': 'Tin nhắn mới',
+  'inboxLive.unreadTotal': '{n} tin chưa đọc',
 }

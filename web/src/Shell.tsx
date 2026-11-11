@@ -5,6 +5,7 @@ import { usePageHealth, type PageHealth } from './health'
 import { LANGS, useI18n, type MessageKey } from './i18n'
 import type { InboxData } from './inbox/data'
 import { InboxTab } from './inbox/InboxTab'
+import { useUnreadTotal } from './inbox/useUnreadTotal'
 import type { PagesData } from './pages/data'
 import { PagesTab } from './pages/PagesTab'
 import { TABS, useTab, type Tab } from './router'
@@ -28,10 +29,11 @@ export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }:
   const closeNav = useRef<HTMLButtonElement>(null)
   const title = t(`tab.${tab}`)
   const health = usePageHealth(pagesData, tab)
+  const unread = useUnreadTotal(inboxData)
 
   useEffect(() => {
-    document.title = `${title} · UniMatch`
-  }, [title])
+    document.title = `${unread ? `(${unread}) ` : ''}${title} · UniMatch`
+  }, [title, unread])
 
   useEffect(() => {
     if (!navOpen) return
@@ -62,7 +64,7 @@ export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }:
           <ul className="nav">
             {TABS.map((item) => (
               <li key={item}>
-                <NavItem tab={item} current={item === tab} onGo={go} />
+                <NavItem tab={item} current={item === tab} onGo={go} unread={item === 'inbox' ? unread : 0} />
               </li>
             ))}
           </ul>
@@ -89,7 +91,7 @@ export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }:
   )
 }
 
-function NavItem({ tab, current, onGo }: { tab: Tab; current: boolean; onGo: (tab: Tab) => void }) {
+function NavItem({ tab, current, onGo, unread }: { tab: Tab; current: boolean; onGo: (tab: Tab) => void; unread: number }) {
   const { t } = useI18n()
   const disabled = DISABLED.has(tab)
   return (
@@ -106,6 +108,11 @@ function NavItem({ tab, current, onGo }: { tab: Tab; current: boolean; onGo: (ta
       <Icon name={TAB_ICONS[tab]} />
       {t(`tab.${tab}`)}
       {disabled && <span className="count">{t('nav.soon')}</span>}
+      {unread > 0 && (
+        <span className="count" aria-label={t('inboxLive.unreadTotal', { n: unread })}>
+          {unread > 99 ? '99+' : unread}
+        </span>
+      )}
     </a>
   )
 }
