@@ -102,6 +102,8 @@ export type Database = {
       }
       conversations: {
         Row: {
+          bot_lock_until: string | null
+          bot_replied_up_to: string | null
           created_at: string
           customer_name: string | null
           customer_picture_url: string | null
@@ -119,6 +121,8 @@ export type Database = {
           unread_count: number
         }
         Insert: {
+          bot_lock_until?: string | null
+          bot_replied_up_to?: string | null
           created_at?: string
           customer_name?: string | null
           customer_picture_url?: string | null
@@ -136,6 +140,8 @@ export type Database = {
           unread_count?: number
         }
         Update: {
+          bot_lock_until?: string | null
+          bot_replied_up_to?: string | null
           created_at?: string
           customer_name?: string | null
           customer_picture_url?: string | null
@@ -217,39 +223,39 @@ export type Database = {
           access_token_secret_id: string | null
           bot_enabled: boolean
           connected_at: string
+          handoff_keywords: string[]
           id: string
           name: string
           picture_url: string | null
           reply_delay_ms: number
           reply_hours: Json
           reply_mode: string
-          handoff_keywords: string[]
           token_expires_at: string | null
         }
         Insert: {
           access_token_secret_id?: string | null
           bot_enabled?: boolean
           connected_at?: string
+          handoff_keywords?: string[]
           id: string
           name: string
           picture_url?: string | null
           reply_delay_ms?: number
           reply_hours?: Json
           reply_mode?: string
-          handoff_keywords?: string[]
           token_expires_at?: string | null
         }
         Update: {
           access_token_secret_id?: string | null
           bot_enabled?: boolean
           connected_at?: string
+          handoff_keywords?: string[]
           id?: string
           name?: string
           picture_url?: string | null
           reply_delay_ms?: number
           reply_hours?: Json
           reply_mode?: string
-          handoff_keywords?: string[]
           token_expires_at?: string | null
         }
         Relationships: []
@@ -296,7 +302,18 @@ export type Database = {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
         Returns: string
       }
+      claim_bot_turn: {
+        Args: { p_after_ms: number; p_page_id: string; p_psid: string }
+        Returns: {
+          conversation_id: string
+          reply_up_to: string
+        }[]
+      }
       clear_page_token: { Args: { p_page_id: string }; Returns: undefined }
+      finish_bot_turn: {
+        Args: { p_conversation_id: string; p_up_to: string }
+        Returns: boolean
+      }
       get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
