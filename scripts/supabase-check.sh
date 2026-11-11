@@ -12,8 +12,4 @@ done
 
 deno check scripts/seed.ts
 
-tests=$(find scripts supabase/functions -name '*.test.ts' -not -path '*/node_modules/*')
-if [ -n "$tests" ]; then
-  # shellcheck disable=SC2086
-  deno test $tests
-fi
+deno test --permit-no-files scripts supabase/functions
