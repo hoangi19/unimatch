@@ -69,7 +69,7 @@ export const vi: Record<MessageKey, string> = {
   'pages.status.disconnecting': 'Đang ngắt kết nối…',
   'pages.expiredTitle': 'Facebook không còn chấp nhận token của Trang này.',
   'pages.expiredBody': 'Kết nối lại Trang để bot trả lời tiếp.',
-  'pages.expiringTitle': 'Token của Trang hết hạn sau {n} ngày.',
+  'pages.expiringTitle': 'Token của Trang hết hạn {when}.',
   'pages.expiringBody': 'Kết nối lại Trang trước thời điểm đó để bot không bị gián đoạn.',
   'pages.disconnectedBody': 'Bot không nhận và không trả lời tin nhắn của Trang này. Kết nối lại để tiếp tục.',
   'pages.autoReply': 'Tự động trả lời',
@@ -426,7 +426,4 @@ export const vi: Record<MessageKey, string> = {
   'inboxStats.botPct': 'Bot tự xử lý',
   'inboxStats.firstResponse': 'Phản hồi đầu TB',
   'inboxStats.waiting': 'Chờ nhân viên',
-  'inboxStats.seconds': '{n} giây',
-  'inboxStats.minutes': '{n} phút',
-  'inboxStats.hours': '{n} giờ',
 }

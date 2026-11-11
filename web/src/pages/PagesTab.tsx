@@ -283,7 +283,7 @@ type CardProps = {
 }
 
 function PageCard({ row, status, form, errors, settingsOpen, disconnecting, onToggleSettings, onBot, onForm, onReconnect, onDisconnect }: CardProps) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const nameId = `pg-${row.id}-name`
   const settingsId = `ps-${row.id}`
   const shown: PageStatus['kind'] | 'disconnecting' = disconnecting ? 'disconnecting' : status.kind
@@ -331,7 +331,7 @@ function PageCard({ row, status, form, errors, settingsOpen, disconnecting, onTo
             <div className="callout callout-warning">
               <Icon name="clock" />
               <div className="callout-body">
-                <strong>{t('pages.expiringTitle', { n: status.daysLeft! })}</strong> {t('pages.expiringBody')}
+                <strong>{t('pages.expiringTitle', { when: fmt.relative(status.daysLeft!, 'day') })}</strong> {t('pages.expiringBody')}
               </div>
             </div>
           )}
@@ -368,7 +368,7 @@ function PageCard({ row, status, form, errors, settingsOpen, disconnecting, onTo
 }
 
 function ReplySettings({ pageId, form, errors, onForm }: { pageId: string; form: ReplyForm; errors: ReplyErrors; onForm: (patch: Partial<ReplyForm>) => void }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const dayNames = t('pages.ps.dayNames').split(',')
   const daysErrId = `${fieldId(pageId, 'days')}-err`
   const err = (key?: MessageKey) => (key ? t(key) : undefined)
@@ -448,7 +448,7 @@ function ReplySettings({ pageId, form, errors, onForm }: { pageId: string; form:
               aria-describedby={`${fieldId(pageId, 'delay')}-hint`}
               onChange={(e) => onForm({ delayS: Number(e.target.value) })}
             />
-            <output htmlFor={fieldId(pageId, 'delay')}>{form.delayS}s</output>
+            <output htmlFor={fieldId(pageId, 'delay')}>{fmt.duration(form.delayS)}</output>
           </div>
           <div className="range-scale" aria-hidden="true">
             <span>{t('pages.ps.instant')}</span>

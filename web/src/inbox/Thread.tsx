@@ -11,7 +11,6 @@ import {
   eventText,
   isStatus,
   parseEvent,
-  shortTime,
   windowOpen,
   type ConversationRow,
   type InboxData,
@@ -47,7 +46,7 @@ type ThreadProps = {
 }
 
 export function Thread({ data, conversation, pageName, onBack, onChange, footer }: ThreadProps) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const toast = useToast()
   const thread = useThread(data, conversation.id)
   const { messages, hasMore, status, loadingOlder, reload, loadOlder } = thread
@@ -190,7 +189,7 @@ export function Thread({ data, conversation, pageName, onBack, onChange, footer 
               )}
               {!messages.length && <li className="ib-none">{t('inbox.noMessages')}</li>}
               {messages.map((m) => (
-                <MessageItem key={m.id} message={m} time={shortTime(m.created_at, lang, now)} onRetry={(failed) => void send(failed.text ?? '', failed)} />
+                <MessageItem key={m.id} message={m} time={fmt.shortTime(m.created_at, now)} onRetry={(failed) => void send(failed.text ?? '', failed)} />
               ))}
             </>
           )}

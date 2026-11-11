@@ -179,22 +179,17 @@ export function attachmentTypes(attachments: Json | null): AttachmentType[] {
   return attachments.map((a) => oneOf(ATTACHMENT_TYPES, a && typeof a === 'object' && !Array.isArray(a) ? a.type : undefined))
 }
 
-/** Clock time for today, a short date otherwise (with the year when it differs). */
-export function shortTime(iso: string, lang: string, now = new Date()): string {
-  const date = new Date(iso)
-  const sameDay = date.toDateString() === now.toDateString()
-  const options: Intl.DateTimeFormatOptions = sameDay
-    ? { hour: '2-digit', minute: '2-digit' }
-    : { day: 'numeric', month: 'numeric', ...(date.getFullYear() !== now.getFullYear() && { year: 'numeric' }) }
-  return new Intl.DateTimeFormat(lang, options).format(date)
-}
-
 /** One line for a system event, e.g. "Handed to a person · customer sent “help”". */
 export function eventText(t: Translate, event: SystemEvent, legacyText: string | null): string {
   const head = t(`inbox.event.${event.code}`)
   if (!event.reason) return event.code === 'other' && legacyText ? `${head}: ${legacyText}` : head
-  const reason = event.reason === 'keyword' && event.keyword ? t('inbox.reason.keywordNamed', { keyword: event.keyword }) : t(`inbox.reason.${event.reason}`)
-  return `${head} · ${reason}`
+  return `${head} · ${reasonText(t, event.reason, event.keyword)}`
+}
+
+/** A handoff reason code in words; unknown codes read as "other reason". */
+export function reasonText(t: Translate, reason: string | null | undefined, keyword?: string): string {
+  const code = oneOf(EVENT_REASONS, reason)
+  return code === 'keyword' && keyword ? t('inbox.reason.keywordNamed', { keyword }) : t(`inbox.reason.${code}`)
 }
 
 export type MessageStats = { user: number; bot: number; admin: number; handoffs: number }

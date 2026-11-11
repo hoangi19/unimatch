@@ -6,7 +6,6 @@ import {
   countByFilter,
   FILTERS,
   matchesSearch,
-  shortTime,
   sortConversations,
   upsertConversation,
   type ConversationRow,
@@ -24,7 +23,7 @@ import './inbox.css'
 type Loaded = { pages: InboxPage[]; conversations: ConversationRow[]; now: Date }
 
 export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPage?: () => void }) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const [loaded, setLoaded] = useState<Loaded | null | 'error'>(null)
   const [query, setQuery] = useState('')
   const [pageId, setPageId] = useState('all')
@@ -183,7 +182,7 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
                       <span className="conv-main">
                         <span className="conv-top">
                           <strong>{c.customer_name ?? t('inbox.noName')}</strong>
-                          {c.last_message_at && <time dateTime={c.last_message_at}>{shortTime(c.last_message_at, lang, now)}</time>}
+                          {c.last_message_at && <time dateTime={c.last_message_at}>{fmt.shortTime(c.last_message_at, now)}</time>}
                         </span>
                         <span className={c.unread_count ? 'conv-snip is-unread' : 'conv-snip'}>{c.last_message_preview ?? ''}</span>
                         <span className="conv-tags">

@@ -2,14 +2,14 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { Button, Skeleton } from '../ui/controls'
 import { Icon } from '../ui/Icon'
-import { NOTES_DEBOUNCE_MS, type ConversationDetails, type ConversationRow, type InboxData } from './data'
+import { NOTES_DEBOUNCE_MS, reasonText, type ConversationDetails, type ConversationRow, type InboxData } from './data'
 import { Avatar, StatusBadge } from './Thread'
 
 type Save = 'idle' | 'saving' | 'saved' | 'error'
 
 /** Profile, stats and internal notes of one conversation. Mount it per conversation (`key`). */
 export function CustomerInfo({ data, conversation, name, pageName }: { data: InboxData; conversation: ConversationRow; name: string; pageName: string }) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const [details, setDetails] = useState<ConversationDetails | null | 'error'>(null)
   const id = conversation.id
 
@@ -22,7 +22,6 @@ export function CustomerInfo({ data, conversation, name, pageName }: { data: Inb
 
   const ready = details && details !== 'error' ? details : null
   const language = ready?.language
-  const n = (v: number) => new Intl.NumberFormat(lang).format(v)
   const stats = ready && [
     [ready.stats.user, t('inbox.ctx.fromUser')],
     [ready.stats.bot, t('inbox.ctx.fromBot')],
@@ -55,7 +54,7 @@ export function CustomerInfo({ data, conversation, name, pageName }: { data: Inb
           </div>
           <div>
             <dt>{t('inbox.ctx.firstSeen')}</dt>
-            <dd>{ready ? new Intl.DateTimeFormat(lang, { dateStyle: 'medium' }).format(new Date(ready.created_at)) : '—'}</dd>
+            <dd>{ready ? fmt.date(ready.created_at) : '—'}</dd>
           </div>
           <div>
             <dt>{t('inbox.ctx.language')}</dt>
@@ -68,7 +67,7 @@ export function CustomerInfo({ data, conversation, name, pageName }: { data: Inb
           {conversation.handoff_reason && (
             <div>
               <dt>{t('inbox.info.handoff')}</dt>
-              <dd>{conversation.handoff_reason}</dd>
+              <dd>{reasonText(t, conversation.handoff_reason)}</dd>
             </div>
           )}
         </dl>
@@ -89,7 +88,7 @@ export function CustomerInfo({ data, conversation, name, pageName }: { data: Inb
               {stats
                 ? stats.map(([v, k]) => (
                     <div key={k}>
-                      <span className="v">{n(v)}</span>
+                      <span className="v">{fmt.number(v)}</span>
                       <span className="k">{k}</span>
                     </div>
                   ))

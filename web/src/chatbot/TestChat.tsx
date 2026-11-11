@@ -117,7 +117,7 @@ export function TestChat({ api, draft, dirty }: { api: ChatbotApi; draft: Draft;
         {log.map((m, i) =>
           m.role === 'error' ? (
             <div key={i} className="msg system" role="alert">
-              <div className="bubble chat-error" title={m.message}>
+              <div className="bubble chat-error">
                 <Icon name="alert" />
                 {m.kind === 'invalid' ? (
                   <span>{t('chatbot.test.invalid')}</span>

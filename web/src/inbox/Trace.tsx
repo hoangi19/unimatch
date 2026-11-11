@@ -1,6 +1,6 @@
 import { useI18n } from '../i18n'
 import { Icon } from '../ui/Icon'
-import { parseTrace } from './data'
+import { parseTrace, reasonText } from './data'
 import type { Json } from '../lib/database.types'
 
 const HOURS = ['always', 'open', 'closed', 'invalid'] as const
@@ -8,11 +8,11 @@ const NONE = '—'
 
 /** "Why did the bot reply this way" under a bot bubble. Renders nothing for rows without a trace. */
 export function Trace({ trace: raw }: { trace: Json | null }) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const trace = parseTrace(raw)
   if (!trace) return null
-  const n = (v: number | undefined) => (v === undefined ? NONE : new Intl.NumberFormat(lang).format(v))
-  const handoff = trace.handoff && t(`inbox.reason.${trace.handoff}`)
+  const n = (v: number | undefined) => (v === undefined ? NONE : fmt.number(v))
+  const handoff = trace.handoff && reasonText(t, trace.handoff)
   const hours = trace.hours && ((HOURS as readonly string[]).includes(trace.hours) ? t(`inbox.trace.hours.${trace.hours as (typeof HOURS)[number]}`) : trace.hours)
   const summary = trace.fallback ? t('inbox.trace.fallbackUsed') : handoff || [trace.provider, trace.model].filter(Boolean).join(' · ') || NONE
   const rows: [string, string][] = [
