@@ -1,4 +1,5 @@
-// Admin manual send: POST {conversation_id, text} with the admin's Supabase session token.
+// Admin manual send: POST {conversation_id, text, retry_of?} with the admin's Supabase session token.
+// retry_of names a failed admin message of the same conversation; the new attempt's row replaces it.
 import { MAX_TEXT, type Sender, type SendResult } from "../_shared/messenger/send.ts";
 
 export type Deps = {
@@ -8,6 +9,10 @@ export type Deps = {
   sendText(pageId: string, psid: string, text: string, sender: Sender): Promise<SendResult>;
   // Pauses the bot: status human plus a takeover event, unless an admin already owns it.
   takeOver(conversationId: string, adminId: string): Promise<void>;
+  // True when the message is a failed admin message of the conversation.
+  isFailedAdminMessage(id: string, conversationId: string): Promise<boolean>;
+  // Deletes it under the same conditions, so a delivered or foreign row is never removed.
+  deleteFailedAdminMessage(id: string, conversationId: string): Promise<void>;
 };
 
 const CORS = {
@@ -37,15 +42,25 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json({ error: "conversation_id must be a uuid" }, 400);
   }
   if (!text || text.length > MAX_TEXT) return json({ error: `text must be 1 to ${MAX_TEXT} characters` }, 400);
+  const retryOf = body.retry_of ?? null;
+  if (retryOf !== null && (typeof retryOf !== "string" || !UUID.test(retryOf))) return json({ error: "retry_of must be a uuid" }, 400);
 
   try {
     const conv = await deps.findConversation(body.conversation_id);
     if (!conv) return json({ ok: false, error: { kind: "not_found", message: "Conversation not found" } }, 404);
+    if (retryOf && !(await deps.isFailedAdminMessage(retryOf, body.conversation_id))) {
+      return json({ error: "retry_of must be a failed admin message of this conversation" }, 400);
+    }
     const result = await deps.sendText(conv.pageId, conv.psid, text, { kind: "admin", adminId: user.id });
     // The customer has the message, so a failed takeover is only logged.
     if (result.ok) {
       await deps.takeOver(body.conversation_id, user.id)
         .catch((e) => console.error("send-message: takeover failed", e instanceof Error ? e.message : "unknown error"));
+    }
+    // The new attempt has its own row now (or reached the customer), so the old failed one goes.
+    if (retryOf && (result.ok || result.messageId)) {
+      await deps.deleteFailedAdminMessage(retryOf, body.conversation_id)
+        .catch((e) => console.error("send-message: could not drop the retried row", e instanceof Error ? e.message : "unknown error"));
     }
     return result.ok
       ? json({ ok: true, message_id: result.messageId })

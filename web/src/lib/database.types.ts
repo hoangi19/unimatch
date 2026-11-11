@@ -60,6 +60,7 @@ export type Database = {
           id: boolean
           language: string
           max_tokens: number
+          quick_replies: string[]
           rate_limit_per_hour: number
           system_prompt: string
           temperature: number
@@ -73,6 +74,7 @@ export type Database = {
           id?: boolean
           language?: string
           max_tokens?: number
+          quick_replies?: string[]
           rate_limit_per_hour?: number
           system_prompt: string
           temperature?: number
@@ -86,6 +88,7 @@ export type Database = {
           id?: boolean
           language?: string
           max_tokens?: number
+          quick_replies?: string[]
           rate_limit_per_hour?: number
           system_prompt?: string
           temperature?: number

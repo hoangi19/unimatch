@@ -51,11 +51,18 @@ export function useThread(data: InboxData, conversationId: string) {
   }
 
   const upsert = useCallback((message: MessageRow) => setState((s) => ({ ...s, messages: mergeMessages(s.messages, [message]) })), [])
+  const remove = useCallback((id: string) => setState((s) => ({ ...s, messages: s.messages.filter((m) => m.id !== id) })), [])
+
+  /** Merges in the newest page, e.g. the row a send or a status change just stored. Errors are ignored. */
+  const sync = useCallback(async () => {
+    const page = await data.loadMessages(conversationId).catch(() => [])
+    setState((s) => ({ ...s, messages: mergeMessages(s.messages, page) }))
+  }, [data, conversationId])
 
   const reload = () => {
     setState(INITIAL)
     load()
   }
 
-  return { ...state, reload, loadOlder, upsert }
+  return { ...state, reload, loadOlder, upsert, remove, sync }
 }

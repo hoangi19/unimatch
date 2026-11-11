@@ -33,7 +33,6 @@ const DETAILS: ConversationDetails = { notes: 'Hỏi về Data Engineer', langua
 const fakeLive = (patch: Partial<InboxData> = {}) =>
   liveData({ loadPages: vi.fn(async () => PAGES), loadConversations: vi.fn(async () => CONVERSATIONS), loadDetails: vi.fn(async () => DETAILS), ...patch })
 const fakeData = (patch: Partial<InboxData> = {}): InboxData => fakeLive(patch).data
-
 const renderTab = (data: InboxData, onConnectPage?: () => void) =>
   render(
     <I18nProvider>

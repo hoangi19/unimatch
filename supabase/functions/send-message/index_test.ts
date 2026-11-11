@@ -3,10 +3,12 @@ import type { Sender, SendResult } from "../_shared/messenger/send.ts";
 import { type Deps, handle } from "./handler.ts";
 
 const CONV = "00000000-0000-4000-8000-000000000001";
+const FAILED = "00000000-0000-4000-8000-0000000000f1";
 
 function deps(result: SendResult = { ok: true, messageId: "row-1", externalId: "m_1" }, takeOverFails = false) {
   const sends: [string, string, string, Sender][] = [];
   const takeovers: [string, string][] = [];
+  const deleted: [string, string][] = [];
   const d: Deps = {
     getUser: (token) =>
       Promise.resolve(
@@ -25,8 +27,13 @@ function deps(result: SendResult = { ok: true, messageId: "row-1", externalId: "
       takeovers.push([conversationId, adminId]);
       return takeOverFails ? Promise.reject(new Error("db down")) : Promise.resolve();
     },
+    isFailedAdminMessage: (id, conversationId) => Promise.resolve(id === FAILED && conversationId === CONV),
+    deleteFailedAdminMessage: (id, conversationId) => {
+      deleted.push([id, conversationId]);
+      return Promise.resolve();
+    },
   };
-  return { d, sends, takeovers };
+  return { d, sends, takeovers, deleted };
 }
 
 function post(token: string | null, body: unknown = { conversation_id: CONV, text: " hello " }) {
@@ -87,4 +94,28 @@ Deno.test("a typed send error comes back with the failed row id", async () => {
   assertEquals(res.status, 200);
   assertEquals(await res.json(), { ok: false, message_id: null, error });
   assertEquals(takeovers, []);
+});
+
+Deno.test("bad retry_of is 400 and never sends", async () => {
+  for (const retryOf of ["x", 1, "00000000-0000-4000-8000-0000000000f2"]) {
+    const { d, sends, deleted } = deps();
+    assertEquals((await handle(post("admin-token", { conversation_id: CONV, text: "hi", retry_of: retryOf }), d)).status, 400);
+    assertEquals([sends.length, deleted.length], [0, 0]);
+  }
+});
+
+Deno.test("a retry replaces the failed row once the new attempt has a row", async () => {
+  const error = { kind: "rate_limit" as const, message: "Messenger rate limit reached; try again later" };
+  const cases: [SendResult, boolean][] = [
+    [{ ok: true, messageId: "row-2", externalId: "m_2" }, true],
+    [{ ok: true, messageId: null, externalId: "m_2" }, true],
+    [{ ok: false, error, messageId: "row-2" }, true],
+    [{ ok: false, error }, false],
+  ];
+  for (const [result, dropped] of cases) {
+    const { d, sends, deleted } = deps(result);
+    await handle(post("admin-token", { conversation_id: CONV, text: "hi", retry_of: FAILED }), d);
+    assertEquals(sends.length, 1);
+    assertEquals(deleted, dropped ? [[FAILED, CONV]] : []);
+  }
 });

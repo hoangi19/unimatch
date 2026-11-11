@@ -43,7 +43,7 @@ begin
     where conversation_id = v_conv and admin_id = '00000000-0000-0000-0000-000000000023') = '{return_to_bot,takeover}', 'admin events';
 
   begin
-    perform public.set_conversation_mode(v_conv, 'closed');
+    perform public.set_conversation_mode(v_conv, 'paused');
     assert false, 'bad mode accepted';
   exception when raise_exception then null;
   end;

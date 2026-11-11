@@ -1,6 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { CONVERSATION_COLUMNS, CONVERSATION_LIMIT, createHub, MESSAGE_PAGE, type ConversationRow, type InboxData, type MessageRow } from './data'
+import { CONVERSATION_COLUMNS, CONVERSATION_LIMIT, createHub, MESSAGE_PAGE, toSendResult, type ConversationRow, type InboxData, type MessageRow } from './data'
 
 function check(error: PostgrestError | null) {
   if (error) throw new Error(error.message)
@@ -72,4 +72,24 @@ export const supabaseInboxData: InboxData = {
     check(error)
     if (!data?.length) throw new Error('conversation not found')
   },
+  async setMode(conversationId, mode) {
+    check((await supabase.rpc('set_conversation_mode', { p_conversation_id: conversationId, p_mode: mode })).error)
+  },
+  async send(conversationId, text, retryOf) {
+    // invoke() sends the signed-in admin's access token. A non-2xx answer (404, 500) still carries a typed body.
+    const { data, error } = await supabase.functions.invoke('send-message', {
+      body: { conversation_id: conversationId, text, ...(retryOf && { retry_of: retryOf }) },
+    })
+    return toSendResult(data ?? (await errorBody(error)))
+  },
+  async loadQuickReplies() {
+    const { data, error } = await supabase.from('bot_settings').select('quick_replies').maybeSingle()
+    check(error)
+    return data?.quick_replies ?? []
+  },
+}
+
+async function errorBody(error: unknown): Promise<unknown> {
+  const response = (error as { context?: unknown } | null)?.context
+  return response instanceof Response ? response.json().catch(() => null) : null
 }

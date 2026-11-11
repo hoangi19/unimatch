@@ -4,27 +4,55 @@ import { Button, Skeleton } from '../ui/controls'
 import { Drawer } from '../ui/Dialog'
 import { Icon, type IconName } from '../ui/Icon'
 import { useToast } from '../ui/toast-context'
-import { attachmentTypes, eventText, isStatus, parseEvent, shortTime, type ConversationRow, type InboxData, type MessageRow, type SystemEvent } from './data'
 import { CustomerInfo } from './CustomerInfo'
 import { Trace } from './Trace'
+import {
+  attachmentTypes,
+  eventText,
+  isStatus,
+  parseEvent,
+  shortTime,
+  windowOpen,
+  type ConversationRow,
+  type InboxData,
+  type MessageRow,
+  type Mode,
+  type SystemEvent,
+} from './data'
+import { LOCAL_PREFIX, useReply } from './useReply'
 import { useThread } from './useThread'
 import { useWide } from './useWide'
 
 const NEAR_BOTTOM = 48
+
+/** What the thread hands its composer. */
+export type ReplyControls = {
+  send(text: string): void
+  setMode(mode: Mode): void
+  /** A status change is in flight. */
+  busy: boolean
+  /** Messenger's 24-hour reply window has closed for this customer. */
+  windowClosed: boolean
+}
 
 type ThreadProps = {
   data: InboxData
   conversation: ConversationRow
   pageName: string
   onBack: () => void
+  /** Called with the updated row after the admin changed its status. */
+  onChange?: (conversation: ConversationRow) => void
   /** Slot under the log, for the reply composer. */
-  footer?: ReactNode
+  footer?: (reply: ReplyControls) => ReactNode
 }
 
-export function Thread({ data, conversation, pageName, onBack, footer }: ThreadProps) {
+export function Thread({ data, conversation, pageName, onBack, onChange, footer }: ThreadProps) {
   const { t, lang } = useI18n()
   const toast = useToast()
-  const { messages, hasMore, status, loadingOlder, reload, loadOlder } = useThread(data, conversation.id)
+  const thread = useThread(data, conversation.id)
+  const { messages, hasMore, status, loadingOlder, reload, loadOlder } = thread
+  const reply = useReply(data, conversation.id, thread)
+  const [busy, setBusy] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const wide = useWide()
   // Fixed per mount: the thread remounts per conversation.
@@ -51,7 +79,8 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
     const appended = lastId.current !== null && last !== lastId.current
     lastId.current = last
     if (anchor.current !== null) el.scrollTop += el.scrollHeight - anchor.current
-    else if (atBottom.current) el.scrollTop = el.scrollHeight
+    // The admin's own new message always scrolls into view.
+    else if (atBottom.current || (appended && last?.startsWith(LOCAL_PREFIX))) el.scrollTop = el.scrollHeight
     // Reading older messages: keep the view still and point at what arrived.
     else if (appended) setNewBelow(true)
     anchor.current = null
@@ -79,6 +108,25 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
     }
   }
 
+  const setMode = async (mode: Mode) => {
+    setBusy(true)
+    try {
+      await data.setMode(conversation.id, mode)
+      onChange?.({ ...conversation, status: mode, ...(mode === 'bot' && { handoff_reason: null }) })
+      await thread.sync()
+    } catch {
+      toast({ kind: 'error', title: t('inbox.compose.modeFailed') })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const send = async (text: string, retry?: MessageRow) => {
+    const result = await reply.send(text, conversation.last_customer_message_at, retry)
+    if (!result.ok) toast({ kind: 'error', title: t(`inbox.compose.error.${result.error.kind}`) })
+  }
+
+  const current = conversation.status
   return (
     <>
       <header className="ib-head">
@@ -93,7 +141,28 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
             <StatusBadge status={conversation.status} />
           </div>
         </div>
-        {!wide && <Button variant="ghost" size="sm" icon="user" label={t('inbox.details')} onClick={() => setInfoOpen(true)} />}
+        <div className="ib-actions">
+          {current === 'human' && (
+            <Button size="sm" icon="bot" disabled={busy} onClick={() => void setMode('bot')}>
+              {t('inbox.compose.return')}
+            </Button>
+          )}
+          {(current === 'bot' || current === 'needs_human') && (
+            <Button variant="primary" size="sm" icon="user" disabled={busy} onClick={() => void setMode('human')}>
+              {t('inbox.compose.takeOver')}
+            </Button>
+          )}
+          {current === 'closed' ? (
+            <Button size="sm" icon="rotate" disabled={busy} aria-label={t('inbox.compose.reopenAria')} onClick={() => void setMode('bot')}>
+              {t('inbox.compose.reopen')}
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" icon="check" disabled={busy} aria-label={t('inbox.compose.closeAria')} onClick={() => void setMode('closed')}>
+              <span className="hide-sm">{t('inbox.compose.close')}</span>
+            </Button>
+          )}
+          {!wide && <Button variant="ghost" size="sm" icon="user" label={t('inbox.details')} onClick={() => setInfoOpen(true)} />}
+        </div>
       </header>
       {status === 'error' ? (
         <div className="ib-placeholder">
@@ -121,7 +190,7 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
               )}
               {!messages.length && <li className="ib-none">{t('inbox.noMessages')}</li>}
               {messages.map((m) => (
-                <MessageItem key={m.id} message={m} time={shortTime(m.created_at, lang, now)} />
+                <MessageItem key={m.id} message={m} time={shortTime(m.created_at, lang, now)} onRetry={(failed) => void send(failed.text ?? '', failed)} />
               ))}
             </>
           )}
@@ -136,7 +205,12 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
         </div>
         </div>
       )}
-      {footer}
+      {footer?.({
+        send: (text) => void send(text),
+        setMode: (mode) => void setMode(mode),
+        busy,
+        windowClosed: !windowOpen(conversation.last_customer_message_at) || reply.windowClosedBy(conversation.last_customer_message_at),
+      })}
       <Drawer open={infoOpen && !wide} onClose={() => setInfoOpen(false)} title={t('inbox.details')}>
         {/* Mounted only while open: the wide layout shows its own copy, and closing saves a pending note. */}
         {infoOpen && !wide && <CustomerInfo data={data} conversation={conversation} name={name} pageName={pageName} />}
@@ -153,14 +227,14 @@ function ThreadSkeleton() {
   ))
 }
 
-const EVENT_ICONS: Record<SystemEvent['code'], IconName> = { handoff: 'alert', takeover: 'user', return_to_bot: 'bot', other: 'info' }
+const EVENT_ICONS: Record<SystemEvent['code'], IconName> = { handoff: 'alert', takeover: 'user', return_to_bot: 'bot', close: 'check', reopen: 'rotate', other: 'info' }
 
 const DELIVERY_ICONS: Record<string, IconName> = { pending: 'clock', sent: 'check', delivered: 'check-check', read: 'eye', failed: 'alert' }
 const DELIVERY = ['pending', 'sent', 'delivered', 'read', 'failed'] as const
 type Delivery = (typeof DELIVERY)[number]
 const isDelivery = (value: string): value is Delivery => (DELIVERY as readonly string[]).includes(value)
 
-function MessageItem({ message: m, time }: { message: MessageRow; time: string }) {
+function MessageItem({ message: m, time, onRetry }: { message: MessageRow; time: string; onRetry: (m: MessageRow) => void }) {
   const { t } = useI18n()
   if (m.sender_kind === 'system') {
     const event = parseEvent(m.event)
@@ -193,6 +267,11 @@ function MessageItem({ message: m, time }: { message: MessageRow; time: string }
               <Icon name={DELIVERY_ICONS[m.delivery_status]} />
               {t(`inbox.delivery.${m.delivery_status}`)}
             </span>
+          )}
+          {failed && m.sender_kind === 'admin' && m.text && (
+            <button type="button" className="link-btn" onClick={() => onRetry(m)}>
+              {t('inbox.compose.retry')}
+            </button>
           )}
         </div>
       </div>

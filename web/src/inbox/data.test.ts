@@ -11,6 +11,7 @@ import {
   parseTrace,
   shortTime,
   sortConversations,
+  toSendResult,
   type LiveListener,
 } from './data'
 import { conv, msg } from './fixture'
@@ -143,5 +144,18 @@ describe('parseTrace', () => {
     expect(parseTrace(null)).toBeNull()
     expect(parseTrace([1])).toBeNull()
     expect(parseTrace('x')).toBeNull()
+  })
+})
+
+describe('toSendResult', () => {
+  it('maps the function body and turns anything else into send_failed', () => {
+    expect(toSendResult({ ok: true, message_id: 'r1' })).toEqual({ ok: true, messageId: 'r1' })
+    expect(toSendResult({ ok: false, message_id: null, error: { kind: 'rate_limit', message: 'slow' } })).toEqual({
+      ok: false,
+      messageId: null,
+      error: { kind: 'rate_limit', message: 'slow' },
+    })
+    for (const body of [null, 'x', { error: 'Admin only' }, { ok: false, error: { kind: 'weird' } }])
+      expect(toSendResult(body)).toEqual({ ok: false, messageId: null, error: { kind: 'send_failed', message: 'Unexpected response' } })
   })
 })
