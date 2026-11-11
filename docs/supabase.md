@@ -11,7 +11,7 @@ The hosted project is the only environment. There is no CI: checks, seeding and 
 
 - Functions live in `supabase/functions/<name>/index.ts`.
 - JWT verification per function is set in `supabase/config.toml` (`meta-webhook` has `verify_jwt = false`).
-- Secrets are set with `supabase secrets set NAME=value --project-ref <ref>`. Never commit them.
+- Set secrets through a hidden prompt, as `scripts/set-meta-app-secret.sh` does. Never type a value on the command line or commit it.
 - `scripts/supabase-deploy.sh` deploys all functions.
 
 ## Types
