@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
-import { type Deps, handler, toRows, validSignature } from "./handler.ts";
+import { type Deps, handler, type Target, toRows, userTargets, validSignature } from "./handler.ts";
 
 const SECRET = "test-app-secret";
 
@@ -13,7 +13,9 @@ async function sign(body: string, secret = SECRET): Promise<string> {
 
 function fakeDeps(error: string | null = null) {
   const stored: unknown[][] = [];
+  const triggered: Target[][] = [];
   const deps: Deps = {
+    onUserMessages: (targets) => triggered.push(targets),
     verifyToken: "test-verify",
     appSecret: SECRET,
     store: (rows) => {
@@ -21,7 +23,7 @@ function fakeDeps(error: string | null = null) {
       return Promise.resolve(error);
     },
   };
-  return { deps, stored };
+  return { deps, stored, triggered };
 }
 
 async function post(payload: unknown, deps: Deps, signature?: string | null): Promise<Response> {
@@ -96,4 +98,28 @@ Deno.test("GET verifies the subscribe handshake", async () => {
   const url = "http://localhost/meta-webhook?hub.mode=subscribe&hub.challenge=42&hub.verify_token=";
   assertEquals(await (await handler(new Request(url + "test-verify"), deps)).text(), "42");
   assertEquals((await handler(new Request(url + "wrong"), deps)).status, 403);
+});
+
+Deno.test("userTargets keeps customer messages and postbacks, newest per conversation", () => {
+  const later = { ...userMessage, timestamp: 1767225609000, message: { mid: "m.9", text: "more" } };
+  const other = { ...userMessage, sender: { id: "u2" }, message: { mid: "m.8", text: "yo" } };
+  const rows = toRows({ object: "page", entry: [{ id: PAGE, messaging: [userMessage, echo, postback, delivery, read, later, other] }] });
+  assertEquals(userTargets(rows), [
+    { pageId: PAGE, psid: "u1", at: 1767225609000 },
+    { pageId: PAGE, psid: "u2", at: 1767225600000 },
+  ]);
+});
+
+Deno.test("the reply engine is triggered only after a successful store", async () => {
+  const ok = fakeDeps();
+  await post(payload, ok.deps);
+  assertEquals(ok.triggered, [[{ pageId: PAGE, psid: "u1", at: 1767225602000 }]]);
+
+  const failed = fakeDeps("connection reset");
+  await post(payload, failed.deps);
+  assertEquals(failed.triggered.length, 0);
+
+  const echoesOnly = fakeDeps();
+  await post({ object: "page", entry: [{ id: PAGE, messaging: [echo, delivery] }] }, echoesOnly.deps);
+  assertEquals(echoesOnly.triggered, [[]]);
 });

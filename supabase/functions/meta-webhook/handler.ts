@@ -7,7 +7,11 @@ export type Deps = {
   appSecret: string;
   // Inserts rows, skipping known external_ids. Returns an error message on failure.
   store: (rows: Row[]) => Promise<string | null>;
+  // Called after a successful store with each conversation that got customer messages; must not block.
+  onUserMessages?: (targets: Target[]) => void;
 };
+
+export type Target = { pageId: string; psid: string; at: number };
 
 export async function validSignature(body: string, header: string | null, secret: string): Promise<boolean> {
   if (!header?.startsWith("sha256=")) return false;
@@ -26,7 +30,7 @@ export async function validSignature(body: string, header: string | null, secret
 type MessagingItem = {
   sender?: { id?: string };
   timestamp?: number;
-  message?: { mid?: string };
+  message?: { mid?: string; is_echo?: boolean };
   postback?: { mid?: string };
   [field: string]: unknown;
 };
@@ -47,6 +51,19 @@ export function toRows(payload: WebhookPayload): Row[] {
     }
   }
   return rows;
+}
+
+// Customer messages and postbacks, one target per conversation with its newest Meta timestamp.
+export function userTargets(rows: Row[]): Target[] {
+  const latest = new Map<string, Target>();
+  for (const { page_id, field, payload } of rows) {
+    const psid = payload.sender?.id;
+    const fromCustomer = (field === "messages" && !payload.message?.is_echo) || field === "messaging_postbacks";
+    if (!fromCustomer || !psid || typeof payload.timestamp !== "number") continue;
+    const key = `${page_id}:${psid}`;
+    if ((latest.get(key)?.at ?? -1) < payload.timestamp) latest.set(key, { pageId: page_id, psid, at: payload.timestamp });
+  }
+  return [...latest.values()];
 }
 
 export async function handler(req: Request, deps: Deps): Promise<Response> {
@@ -79,6 +96,8 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
       console.error("store failed", error);
       return new Response("store failed", { status: 500 });
     }
+    // Retries run this again; claim_bot_turn makes that a no-op once the message is answered.
+    deps.onUserMessages?.(userTargets(rows));
   }
   return new Response("EVENT_RECEIVED");
 }
