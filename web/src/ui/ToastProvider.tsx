@@ -29,13 +29,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={show}>
       {children}
       <div className="toasts" role="status" aria-live="polite">
-        {toasts.map(({ id, kind = 'info', title, body }) => (
+        {toasts.map(({ id, kind = 'info', title, body, action }) => (
           <div key={id} className={`toast ${kind}`}>
             <Icon name={ICONS[kind]} />
             <div className="t-body">
               <strong>{title}</strong>
               {body && <span>{body}</span>}
             </div>
+            {action && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  action.onClick()
+                  dismiss(id)
+                }}
+              >
+                {action.label}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" icon="x" label={t('common.dismiss')} onClick={() => dismiss(id)} />
           </div>
         ))}

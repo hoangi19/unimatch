@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LANGS, useI18n, type MessageKey } from './i18n'
+import type { PagesData } from './pages/data'
+import { PagesTab } from './pages/PagesTab'
 import { TABS, useTab, type Tab } from './router'
 import { useTheme, type Theme } from './theme'
 import { Button, EmptyState } from './ui/controls'
@@ -11,9 +13,10 @@ const TAB_ICONS: Record<Tab, IconName> = { inbox: 'inbox', pages: 'facebook', da
 // The Dataset tab is out of product scope for now: shown, but disabled.
 const DISABLED: ReadonlySet<Tab> = new Set(['dataset'])
 
-type ShellProps = { status?: SystemStatus; onSignOut?: () => void }
+/** Tabs render their placeholder until their data source is passed in. */
+type ShellProps = { status?: SystemStatus; onSignOut?: () => void; pagesData?: PagesData }
 
-export function Shell({ status = {}, onSignOut }: ShellProps) {
+export function Shell({ status = {}, onSignOut, pagesData }: ShellProps) {
   const { t } = useI18n()
   const { tab, navigate } = useTab()
   const [navOpen, setNavOpen] = useState(false)
@@ -64,7 +67,7 @@ export function Shell({ status = {}, onSignOut }: ShellProps) {
         <Topbar tab={tab} title={title} onOpenNav={() => setNavOpen(true)} navOpen={navOpen} onSignOut={onSignOut} />
         <StatusBar status={status} />
         <main className="view">
-          <TabPlaceholder tab={tab} />
+          {tab === 'pages' && pagesData ? <PagesTab data={pagesData} /> : <TabPlaceholder tab={tab} />}
         </main>
       </div>
     </div>
