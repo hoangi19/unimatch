@@ -16,5 +16,11 @@ Deno.serve((req) =>
       return data && { pageId: data.page_id, psid: data.psid };
     },
     sendText: (pageId, psid, text, sender) => sendText(messenger, pageId, psid, text, sender),
+    takeOver: async (conversationId, adminId) => {
+      const { error } = await db.rpc("set_conversation_mode_as", {
+        p_conversation_id: conversationId, p_mode: "human", p_admin_id: adminId,
+      });
+      if (error) throw new Error(error.message);
+    },
   })
 );

@@ -23,6 +23,7 @@ export type Page = {
   reply_mode?: "always" | "hours";
   reply_hours?: unknown;
   reply_delay_ms?: number;
+  handoff_keywords?: string[];
 };
 
 export type Settings = {
@@ -33,7 +34,12 @@ export type Settings = {
   temperature: number;
   max_tokens: number;
   rate_limit_per_hour: number;
+  handoff_message: string;
+  guardrails: { handoff_on_keyword?: boolean; handoff_on_low_confidence?: boolean; handoff_on_complaint?: boolean };
 };
+
+// Stored in conversations.handoff_reason and the system event; the Inbox translates it.
+export type HandoffReason = "keyword" | "send_failed" | "bot_error" | "low_confidence" | "complaint";
 
 export type HistoryMessage = { sender_kind: "user" | "bot" | "admin" | "system"; text: string | null };
 
@@ -42,6 +48,8 @@ export type Turn = {
   settings: Settings;
   // Newest last.
   history: HistoryMessage[];
+  // Customer texts not answered yet (after the bot's watermark, up to this turn), oldest first.
+  newCustomerTexts: string[];
   botMessagesLastHour: number;
 };
 
@@ -56,8 +64,10 @@ export type Deps = {
   loadProvider(kind: ProviderKind): Promise<ProviderConfig>;
   chat(config: ProviderConfig, messages: ChatMessage[], params: ChatParams): Promise<ChatResult>;
   sendText(pageId: string, psid: string, text: string, sender: Sender): Promise<SendResult>;
-  handOff(conversationId: string, reason: string): Promise<void>;
+  handOff(conversationId: string, reason: HandoffReason, detail?: Record<string, unknown>): Promise<void>;
   searchJobs?: SearchJobs;
+  // shortcut: no low-confidence or complaint classifier exists yet; wire one here when it does.
+  detectHandoff?: (turn: Turn) => Promise<"low_confidence" | "complaint" | null>;
 };
 
 export type HoursDecision = "always" | "open" | "closed" | "invalid";
@@ -92,6 +102,33 @@ export function hoursDecision(page: Page, now: Date): HoursDecision {
     if (range[0] <= time && time < range[1]) return "open";
   }
   return "closed";
+}
+
+// Case-, accent- and punctuation-insensitive, so "Gặp NGƯỜI thật!" matches "gap nguoi that".
+export function normalize(text: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").replace(/[đĐ]/g, "d").toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+// Whole words only, so "admin" does not match inside "administrator".
+export function matchKeyword(texts: string[], keywords: string[]): string | null {
+  const haystack = ` ${texts.map(normalize).join(" ")} `;
+  return keywords.find((k) => normalize(k) && haystack.includes(` ${normalize(k)} `)) ?? null;
+}
+
+// Runs before the hours and rate-limit checks: a request for a person is always flagged.
+async function detectHandoff(deps: Deps, page: Page, turn: Turn): Promise<{ reason: HandoffReason; detail?: Record<string, unknown> } | null> {
+  if (!page.bot_enabled || turn.conversation.status !== "bot") return null;
+  const { guardrails } = turn.settings;
+  if (guardrails.handoff_on_keyword) {
+    const keyword = matchKeyword(turn.newCustomerTexts, page.handoff_keywords ?? []);
+    if (keyword) return { reason: "keyword", detail: { keyword } };
+  }
+  if (deps.detectHandoff && (guardrails.handoff_on_low_confidence || guardrails.handoff_on_complaint)) {
+    const reason = await deps.detectHandoff(turn);
+    if (reason && guardrails[`handoff_on_${reason}`]) return { reason };
+  }
+  return null;
 }
 
 export type Gate = {
@@ -146,6 +183,15 @@ function log(fields: Record<string, unknown>) {
 
 async function reply(deps: Deps, page: Page, psid: string, conversationId: string, upTo: string) {
   const turn = await deps.loadTurn(conversationId);
+  const handoff = await detectHandoff(deps, page, turn);
+  if (handoff) {
+    log({ pageId: page.id, conversationId, replyUpTo: upTo, handoff: handoff.reason });
+    // Status first, so nothing else answers; a failed notice still leaves it with a person.
+    await deps.handOff(conversationId, handoff.reason, handoff.detail);
+    const sent = await deps.sendText(page.id, psid, turn.settings.handoff_message, { kind: "bot", trace: { handoff: handoff.reason, replyUpTo: upTo } });
+    if (!sent.ok) console.error("bot: handoff message not sent", sent.error.kind);
+    return;
+  }
   const { ok, decisions } = gate(page, turn, deps.now());
   log({ pageId: page.id, conversationId, replyUpTo: upTo, ok, gate: decisions });
   if (!ok) return;
@@ -172,10 +218,7 @@ async function reply(deps: Deps, page: Page, psid: string, conversationId: strin
 
   const sent = await deps.sendText(page.id, psid, text, { kind: "bot", trace });
   if (!sent.ok) {
-    const reason = failure
-      ? `bot: provider ${failure}; fallback send failed: ${sent.error.kind}`
-      : `bot: reply send failed: ${sent.error.kind}`;
-    await deps.handOff(conversationId, reason);
+    await deps.handOff(conversationId, "send_failed", { send_error: sent.error.kind, ...(failure && { provider_error: failure }) });
   }
 }
 
@@ -193,7 +236,7 @@ export async function runBot(deps: Deps, pageId: string, psid: string, afterMs: 
         await reply(deps, page, psid, claimed.conversationId, claimed.upTo);
       } catch (e) {
         console.error("bot: turn failed", e instanceof Error ? e.message : "unknown error");
-        await deps.handOff(claimed.conversationId, "bot: internal error").catch(() => {});
+        await deps.handOff(claimed.conversationId, "bot_error").catch(() => {});
       }
       if (!(await deps.finish(claimed.conversationId, claimed.upTo))) return;
     }

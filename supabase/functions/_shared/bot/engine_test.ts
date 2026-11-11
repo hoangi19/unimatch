@@ -1,7 +1,7 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1.0.6";
 import { AiError, type ChatMessage, type ProviderConfig } from "../ai/chat.ts";
 import type { Sender, SendResult } from "../messenger/send.ts";
-import { buildPrompt, DEBOUNCE_MS, type Deps, hoursDecision, type Page, runBot, type Settings, type Turn } from "./engine.ts";
+import { buildPrompt, DEBOUNCE_MS, type Deps, hoursDecision, matchKeyword, type Page, runBot, type Settings, type Turn } from "./engine.ts";
 
 const SETTINGS: Settings = {
   active_provider: "openai",
@@ -11,6 +11,8 @@ const SETTINGS: Settings = {
   temperature: 0.4,
   max_tokens: 256,
   rate_limit_per_hour: 30,
+  handoff_message: "A teammate will reply soon.",
+  guardrails: { handoff_on_keyword: true },
 };
 const PAGE: Page = { id: "p1", name: "UniMatch", bot_enabled: true };
 const CONFIG = { kind: "openai", baseUrl: "https://api.example.com/v1", model: "m1", apiKey: "k", extraHeaders: {}, supportsTools: true } as ProviderConfig;
@@ -26,7 +28,7 @@ function fake(opts: {
   more?: boolean[];
 } = {}) {
   const sent: Sent[] = [];
-  const handoffs: string[] = [];
+  const handoffs: unknown[] = [];
   const sleeps: number[] = [];
   const claimArgs: (number | null)[] = [];
   const prompts: ChatMessage[][] = [];
@@ -44,6 +46,7 @@ function fake(opts: {
         conversation: { status: "bot" },
         settings: SETTINGS,
         history: [{ sender_kind: "user", text: "hi" }],
+        newCustomerTexts: ["hi"],
         botMessagesLastHour: 0,
         ...opts.turn,
       }),
@@ -57,7 +60,7 @@ function fake(opts: {
       sent.push({ text, sender });
       return Promise.resolve(opts.send?.(sent.length) ?? { ok: true, messageId: "id", externalId: "mid" });
     },
-    handOff: (_c, reason) => (handoffs.push(reason), Promise.resolve()),
+    handOff: (_c, reason, detail) => (handoffs.push(detail ? [reason, detail] : reason), Promise.resolve()),
   };
   return { deps, sent, handoffs, sleeps, claimArgs, prompts, finished };
 }
@@ -151,7 +154,7 @@ Deno.test("fallback send failure hands the conversation to a human with a reason
   quiet(async () => {
     const f = fake({ chat: () => Promise.reject(new AiError("auth", "bad key")), send: () => failedSend });
     await runBot(f.deps, "p1", "u1", 1);
-    assertEquals(f.handoffs, ["bot: provider auth; fallback send failed: outside_window"]);
+    assertEquals(f.handoffs, [["send_failed", { send_error: "outside_window", provider_error: "auth" }]]);
     assertEquals(f.finished.length, 1);
   }));
 
@@ -159,7 +162,7 @@ Deno.test("a failed reply send also hands off", () =>
   quiet(async () => {
     const f = fake({ send: () => failedSend });
     await runBot(f.deps, "p1", "u1", 1);
-    assertEquals(f.handoffs, ["bot: reply send failed: outside_window"]);
+    assertEquals(f.handoffs, [["send_failed", { send_error: "outside_window" }]]);
   }));
 
 Deno.test("an unexpected error hands off and still releases the turn", () =>
@@ -167,7 +170,7 @@ Deno.test("an unexpected error hands off and still releases the turn", () =>
     const f = fake();
     f.deps.loadTurn = () => Promise.reject(new Error("db down"));
     await runBot(f.deps, "p1", "u1", 1);
-    assertEquals(f.handoffs, ["bot: internal error"]);
+    assertEquals(f.handoffs, ["bot_error"]);
     assertEquals(f.finished.length, 1);
   }));
 
@@ -212,3 +215,67 @@ Deno.test("buildPrompt keeps the newest history within the character budget", ()
   assertEquals(messages.slice(1).map((m) => m.role), ["user"]);
   assertEquals(messages[1].content, "newest");
 });
+
+Deno.test("matchKeyword: case, accents, đ and punctuation do not matter; whole words only", () => {
+  const keywords = ["gặp người thật", "nhân viên", "admin"];
+  assertEquals(matchKeyword(["Cho mình GAP NGUOI THAT!!"], keywords), "gặp người thật");
+  assertEquals(matchKeyword(["toi muon gap", "nguoi that"], keywords), "gặp người thật");
+  assertEquals(matchKeyword(["Nhân-viên ơi"], keywords), "nhân viên");
+  assertEquals(matchKeyword(["Đi đâu"], ["di dau"]), "di dau");
+  assertEquals(matchKeyword(["the administrator role"], keywords), null);
+  assertEquals(matchKeyword(["hello"], ["", "  "]), null);
+  assertEquals(matchKeyword([], keywords), null);
+});
+
+const KEYWORD_TURN = { newCustomerTexts: ["older", "Cho em gặp NHÂN VIÊN với"] };
+
+Deno.test("keyword handoff: hands off, sends the handoff message, never calls the AI", () =>
+  quiet(async () => {
+    const f = fake({ page: { handoff_keywords: ["nhan vien"] }, turn: KEYWORD_TURN });
+    await runBot(f.deps, "p1", "u1", 1);
+    assertEquals(f.handoffs, [["keyword", { keyword: "nhan vien" }]]);
+    assertEquals(f.prompts.length, 0);
+    assertEquals(f.sent.map((s) => s.text), ["A teammate will reply soon."]);
+    assertEquals((f.sent[0].sender as { trace: Record<string, unknown> }).trace.handoff, "keyword");
+    assertEquals(f.finished.length, 1);
+  }));
+
+Deno.test("keyword handoff ignores hours and rate limit, and stays handed off when the notice fails", () =>
+  quiet(async () => {
+    const closed = { reply_mode: "hours" as const, reply_hours: { tz: "Asia/Ho_Chi_Minh", days: {} } };
+    const f = fake({
+      page: { handoff_keywords: ["nhan vien"], ...closed },
+      turn: { ...KEYWORD_TURN, botMessagesLastHour: 99 },
+      send: () => failedSend,
+    });
+    await runBot(f.deps, "p1", "u1", 1);
+    assertEquals(f.handoffs, [["keyword", { keyword: "nhan vien" }]]);
+    assertEquals(f.sent.length, 1);
+  }));
+
+Deno.test("no keyword handoff when the guardrail is off, the bot is off, a person owns it, or nothing matches", () =>
+  quiet(async () => {
+    const page = { handoff_keywords: ["nhan vien"] };
+    for (
+      const f of [
+        fake({ page, turn: { ...KEYWORD_TURN, settings: { ...SETTINGS, guardrails: { handoff_on_keyword: false } } } }),
+        fake({ page: { ...page, bot_enabled: false }, turn: KEYWORD_TURN }),
+        fake({ page, turn: { ...KEYWORD_TURN, conversation: { status: "human" } } }),
+        fake({ page, turn: { newCustomerTexts: ["xin chao"] } }),
+      ]
+    ) {
+      await runBot(f.deps, "p1", "u1", 1);
+      assertEquals(f.handoffs, []);
+      assertEquals(f.sent.every((s) => s.text !== "A teammate will reply soon."), true);
+    }
+  }));
+
+Deno.test("detectHandoff hook only counts when its guardrail is on", () =>
+  quiet(async () => {
+    for (const [on, expected] of [[true, ["complaint"]], [false, []]] as const) {
+      const f = fake({ turn: { settings: { ...SETTINGS, guardrails: { handoff_on_complaint: on, handoff_on_low_confidence: true } } } });
+      f.deps.detectHandoff = () => Promise.resolve("complaint");
+      await runBot(f.deps, "p1", "u1", 1);
+      assertEquals(f.handoffs, [...expected]);
+    }
+  }));

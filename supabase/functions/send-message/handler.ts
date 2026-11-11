@@ -6,6 +6,8 @@ export type Deps = {
   getUser(token: string): Promise<{ id: string; app_metadata?: Record<string, unknown> } | null>;
   findConversation(id: string): Promise<{ pageId: string; psid: string } | null>;
   sendText(pageId: string, psid: string, text: string, sender: Sender): Promise<SendResult>;
+  // Pauses the bot: status human plus a takeover event, unless an admin already owns it.
+  takeOver(conversationId: string, adminId: string): Promise<void>;
 };
 
 const CORS = {
@@ -40,6 +42,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const conv = await deps.findConversation(body.conversation_id);
     if (!conv) return json({ ok: false, error: { kind: "not_found", message: "Conversation not found" } }, 404);
     const result = await deps.sendText(conv.pageId, conv.psid, text, { kind: "admin", adminId: user.id });
+    // The customer has the message, so a failed takeover is only logged.
+    if (result.ok) {
+      await deps.takeOver(body.conversation_id, user.id)
+        .catch((e) => console.error("send-message: takeover failed", e instanceof Error ? e.message : "unknown error"));
+    }
     return result.ok
       ? json({ ok: true, message_id: result.messageId })
       : json({ ok: false, message_id: result.messageId ?? null, error: result.error });
