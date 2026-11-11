@@ -165,7 +165,7 @@
 
   /* Brand */
   .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-head); font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
-  .brand small { font-family: var(--font-body); font-weight: 500; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--primary-soft); color: var(--primary-text); }
+  .brand small { font-family: var(--font-body); font-weight: 500; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; padding: 2px 6px; border-radius: 4px; background: var(--primary-soft); color: var(--primary-text); }
   .brand .close-nav { display: none; margin-left: auto; }
 
   /* App shell */

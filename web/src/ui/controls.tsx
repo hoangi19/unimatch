@@ -1,7 +1,7 @@
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useId, type ComponentProps, type InputHTMLAttributes, type ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ComponentProps<'button'> & {
   variant?: 'primary' | 'cta' | 'secondary' | 'ghost' | 'danger'
   size?: 'md' | 'sm'
   icon?: IconName

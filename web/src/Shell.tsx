@@ -17,6 +17,7 @@ export function Shell({ status = {}, onSignOut }: ShellProps) {
   const { t } = useI18n()
   const { tab, navigate } = useTab()
   const [navOpen, setNavOpen] = useState(false)
+  const closeNav = useRef<HTMLButtonElement>(null)
   const title = t(`tab.${tab}`)
 
   useEffect(() => {
@@ -25,6 +26,8 @@ export function Shell({ status = {}, onSignOut }: ShellProps) {
 
   useEffect(() => {
     if (!navOpen) return
+    // Mobile drawer: move keyboard focus into it; the button is hidden on desktop.
+    closeNav.current?.focus()
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false)
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
@@ -41,7 +44,7 @@ export function Shell({ status = {}, onSignOut }: ShellProps) {
         <div className="brand">
           <Logo />
           UniMatch <small>{t('brand.admin')}</small>
-          <Button variant="ghost" icon="x" label={t('nav.close')} className="close-nav" onClick={() => setNavOpen(false)} />
+          <Button ref={closeNav} variant="ghost" icon="x" label={t('nav.close')} className="close-nav" onClick={() => setNavOpen(false)} />
         </div>
         <nav aria-label={t('nav.aria')}>
           <div className="nav-label" aria-hidden="true">
