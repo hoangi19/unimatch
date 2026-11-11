@@ -7,6 +7,13 @@ The hosted project is the only environment. There is no CI: checks, seeding and 
 - Create with `supabase migration new <name>`. One migration file per PR.
 - Migrations are applied to the hosted project by `scripts/supabase-deploy.sh` after the PR merges.
 
+## Access rules
+
+- Single tenant, admins only. RLS is on for every table. The admin check is `public.is_admin()`: an authenticated user whose JWT has `app_metadata.role = 'admin'`. Policies call it; do not inline the check.
+- Edge Functions use the service role and bypass RLS.
+- Page access tokens live in Vault. `pages.access_token_secret_id` holds only the secret id. Write a token with `set_page_token(page_id, token, expires_at)` and read it with `get_page_token(page_id)`. Only `service_role` may call them. Deleting a page deletes its secret.
+- `conversations` and `messages` are in the `supabase_realtime` publication. Realtime applies RLS, so only admins receive changes.
+
 ## Edge Functions
 
 - Functions live in `supabase/functions/<name>/index.ts`.
