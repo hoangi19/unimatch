@@ -5,16 +5,24 @@ set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
+
+git fetch -q origin main
+if [ "$(git branch --show-current)" != "main" ] || [ -n "$(git status --porcelain)" ] || [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+  echo "error: deploy only from a clean main checkout at origin/main" >&2
+  exit 1
+fi
+
 # shellcheck source=scripts/lib/env.sh
 . "$REPO_ROOT/scripts/lib/env.sh"
 
 export SUPABASE_ACCESS_TOKEN
 SUPABASE_ACCESS_TOKEN=$(cat ~/.supabase-token)
 project_ref=$(env_value SUPABASE_PROJECT_REF)
-db_password=$(env_value SUPABASE_DB_PASSWORD)
+export SUPABASE_DB_PASSWORD
+SUPABASE_DB_PASSWORD=$(env_value SUPABASE_DB_PASSWORD)
 
-supabase link --project-ref "$project_ref" -p "$db_password"
-supabase db push -p "$db_password" --yes
+supabase link --project-ref "$project_ref"
+supabase db push --yes
 supabase functions deploy --use-api --project-ref "$project_ref"
 
 ./scripts/gen-types.sh
