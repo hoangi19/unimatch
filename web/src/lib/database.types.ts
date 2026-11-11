@@ -220,6 +220,10 @@ export type Database = {
           id: string
           name: string
           picture_url: string | null
+          reply_delay_ms: number
+          reply_hours: Json
+          reply_mode: string
+          handoff_keywords: string[]
           token_expires_at: string | null
         }
         Insert: {
@@ -229,6 +233,10 @@ export type Database = {
           id: string
           name: string
           picture_url?: string | null
+          reply_delay_ms?: number
+          reply_hours?: Json
+          reply_mode?: string
+          handoff_keywords?: string[]
           token_expires_at?: string | null
         }
         Update: {
@@ -238,6 +246,10 @@ export type Database = {
           id?: string
           name?: string
           picture_url?: string | null
+          reply_delay_ms?: number
+          reply_hours?: Json
+          reply_mode?: string
+          handoff_keywords?: string[]
           token_expires_at?: string | null
         }
         Relationships: []
