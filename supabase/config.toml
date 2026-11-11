@@ -340,3 +340,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.meta-webhook]
 # Meta calls this without a Supabase JWT; requests are authenticated by X-Hub-Signature-256.
 verify_jwt = false
+
+[functions.test-connection]
+# Gateway JWT checks are unreliable with the new API keys; the function verifies the caller with auth.getUser().
+verify_jwt = false
