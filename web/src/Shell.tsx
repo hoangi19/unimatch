@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LANGS, useI18n, type MessageKey } from './i18n'
 import { TABS, useTab, type Tab } from './router'
-import { useTheme } from './theme'
+import { useTheme, type Theme } from './theme'
 import { Button, EmptyState } from './ui/controls'
 import { Icon, Logo, type IconName } from './ui/Icon'
 
@@ -95,7 +95,7 @@ function NavItem({ tab, current, onGo }: { tab: Tab; current: boolean; onGo: (ta
 type TopbarProps = { tab: Tab; title: string; navOpen: boolean; onOpenNav: () => void; onSignOut?: () => void }
 
 function Topbar({ tab, title, navOpen, onOpenNav, onSignOut }: TopbarProps) {
-  const { t, lang, setLang } = useI18n()
+  const { t } = useI18n()
   const { theme, toggleTheme } = useTheme()
   const heading = useRef<HTMLHeadingElement>(null)
   const shownTab = useRef(tab)
@@ -121,19 +121,8 @@ function Topbar({ tab, title, navOpen, onOpenNav, onSignOut }: TopbarProps) {
         {title}
       </h1>
       <span className="spacer" />
-      <div className="lang-switch" role="group" aria-label={t('lang.group')}>
-        {LANGS.map((code) => (
-          <button key={code} type="button" className="lang-btn" lang={code} aria-pressed={lang === code} onClick={() => setLang(code)}>
-            {code.toUpperCase()}
-          </button>
-        ))}
-      </div>
-      <Button
-        variant="ghost"
-        icon={theme === 'dark' ? 'sun' : 'moon'}
-        label={t(theme === 'dark' ? 'theme.toLight' : 'theme.toDark')}
-        onClick={toggleTheme}
-      />
+      <LangSwitch />
+      <ThemeButton theme={theme} onToggle={toggleTheme} />
       <button type="button" className="user-btn" popoverTarget="user-menu" aria-haspopup="menu" aria-label={t('user.menu')}>
         <span className="avatar">AD</span>
         <Icon name="chevron-down" />
@@ -156,6 +145,32 @@ function Topbar({ tab, title, navOpen, onOpenNav, onSignOut }: TopbarProps) {
         </div>
       </div>
     </header>
+  )
+}
+
+export function LangSwitch() {
+  const { t, lang, setLang } = useI18n()
+  return (
+    <div className="lang-switch" role="group" aria-label={t('lang.group')}>
+      {LANGS.map((code) => (
+        <button key={code} type="button" className="lang-btn" lang={code} aria-pressed={lang === code} onClick={() => setLang(code)}>
+          {code.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Takes the theme from its caller: the topbar menu toggles the same theme state.
+export function ThemeButton({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const { t } = useI18n()
+  return (
+    <Button
+      variant="ghost"
+      icon={theme === 'dark' ? 'sun' : 'moon'}
+      label={t(theme === 'dark' ? 'theme.toLight' : 'theme.toDark')}
+      onClick={onToggle}
+    />
   )
 }
 

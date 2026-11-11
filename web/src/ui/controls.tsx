@@ -20,22 +20,31 @@ export function Button({ variant = 'secondary', size = 'md', icon, label, classN
   )
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string }
+type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  label: string
+  hint?: string
+  error?: string
+  /** Control placed inside the input's right edge, e.g. a show-password button. */
+  end?: ReactNode
+}
 
-export function Input({ label, hint, error, id, ...rest }: InputProps) {
+export function Input({ label, hint, error, end, id, ...rest }: InputProps) {
   const autoId = useId()
   const inputId = id ?? autoId
   const noteId = `${inputId}-note`
   return (
     <div className="field">
       <label htmlFor={inputId}>{label}</label>
-      <input
-        id={inputId}
-        className="input"
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error || hint ? noteId : undefined}
-        {...rest}
-      />
+      <div className={end ? 'input-wrap' : undefined}>
+        <input
+          id={inputId}
+          className="input"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? noteId : undefined}
+          {...rest}
+        />
+        {end}
+      </div>
       {error ? (
         <p id={noteId} className="err">
           <Icon name="alert" />

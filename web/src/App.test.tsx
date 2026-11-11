@@ -4,9 +4,12 @@ import App from './App'
 import { ToastProvider } from './ui/ToastProvider'
 import { TOAST_MS, useToast } from './ui/toast-context'
 import { I18nProvider } from './i18n'
+import { fakeSession, stubAuth } from './test-auth'
+
+const admin = () => stubAuth(fakeSession('admin')).auth
 
 it('lands on the inbox in Vietnamese and syncs <html lang>', () => {
-  render(<App />)
+  render(<App auth={admin()} />)
   expect(location.pathname).toBe('/inbox')
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Hộp thư')
   expect(document.documentElement.lang).toBe('vi')
@@ -14,7 +17,7 @@ it('lands on the inbox in Vietnamese and syncs <html lang>', () => {
 
 it('opens a deep link and moves between tabs with history', () => {
   history.replaceState(null, '', '/pages')
-  render(<App />)
+  render(<App auth={admin()} />)
   const heading = screen.getByRole('heading', { level: 1 })
   expect(heading.textContent).toBe('Trang Facebook')
 
@@ -32,7 +35,7 @@ it('opens a deep link and moves between tabs with history', () => {
 })
 
 it('keeps the Dataset tab disabled', () => {
-  render(<App />)
+  render(<App auth={admin()} />)
   const dataset = screen.getByRole('link', { name: /Dữ liệu/ })
   expect(dataset.getAttribute('aria-disabled')).toBe('true')
   fireEvent.click(dataset)
@@ -40,7 +43,7 @@ it('keeps the Dataset tab disabled', () => {
 })
 
 it('switches language and remembers it', () => {
-  render(<App />)
+  render(<App auth={admin()} />)
   fireEvent.click(screen.getByRole('button', { name: 'EN' }))
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Inbox')
   expect(document.documentElement.lang).toBe('en')
@@ -48,20 +51,12 @@ it('switches language and remembers it', () => {
 })
 
 it('shows neutral status until data arrives, and real values once passed', () => {
-  const { rerender } = render(<App />)
+  const auth = admin()
+  const { rerender } = render(<App auth={auth} />)
   expect(screen.getAllByText('Chưa thiết lập')).toHaveLength(3)
-  rerender(<App status={{ webhook: 'OK', ai: 'OpenAI', botOn: false }} />)
+  rerender(<App auth={auth} status={{ webhook: 'OK', ai: 'OpenAI', botOn: false }} />)
   expect(screen.getByText('OpenAI')).toBeTruthy()
   expect(screen.getByText('Tạm dừng')).toBeTruthy()
-})
-
-it('shows sign out only when it is wired', () => {
-  const { rerender } = render(<App />)
-  expect(screen.queryByText('Đăng xuất')).toBeNull()
-  const onSignOut = vi.fn()
-  rerender(<App onSignOut={onSignOut} />)
-  fireEvent.click(screen.getByText('Đăng xuất'))
-  expect(onSignOut).toHaveBeenCalledOnce()
 })
 
 it('dismisses toasts after a timeout', () => {
