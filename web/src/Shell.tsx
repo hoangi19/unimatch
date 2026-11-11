@@ -3,6 +3,8 @@ import type { ChatbotApi } from './chatbot/api'
 import { Chatbot } from './chatbot/Chatbot'
 import { usePageHealth, type PageHealth } from './health'
 import { LANGS, useI18n, type MessageKey } from './i18n'
+import type { InboxData } from './inbox/data'
+import { InboxTab } from './inbox/InboxTab'
 import type { PagesData } from './pages/data'
 import { PagesTab } from './pages/PagesTab'
 import { TABS, useTab, type Tab } from './router'
@@ -17,9 +19,9 @@ const TAB_ICONS: Record<Tab, IconName> = { inbox: 'inbox', pages: 'facebook', da
 const DISABLED: ReadonlySet<Tab> = new Set(['dataset'])
 
 /** Tabs render their placeholder until their data source is passed in. */
-type ShellProps = { status?: SystemStatus; onSignOut?: () => void; pagesData?: PagesData; chatbot?: ChatbotApi }
+type ShellProps = { status?: SystemStatus; onSignOut?: () => void; inboxData?: InboxData; pagesData?: PagesData; chatbot?: ChatbotApi }
 
-export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps) {
+export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }: ShellProps) {
   const { t } = useI18n()
   const { tab, navigate } = useTab()
   const [navOpen, setNavOpen] = useState(false)
@@ -46,7 +48,7 @@ export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps
   }
 
   return (
-    <div className={navOpen ? 'app nav-open' : 'app'}>
+    <div className={['app', navOpen && 'nav-open', tab === 'inbox' && inboxData && 'inbox-mode'].filter(Boolean).join(' ')}>
       <aside className="sidebar" id="sidebar">
         <div className="brand">
           <Logo />
@@ -72,7 +74,9 @@ export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps
         <StatusBar status={status} health={health} />
         {!!health?.invalid && tab !== 'pages' && <HealthBanner invalid={health.invalid} onReconnect={() => go('pages')} />}
         <main className="view">
-          {tab === 'pages' && pagesData ? (
+          {tab === 'inbox' && inboxData ? (
+            <InboxTab data={inboxData} onConnectPage={() => go('pages')} />
+          ) : tab === 'pages' && pagesData ? (
             <PagesTab data={pagesData} />
           ) : tab === 'chatbot' && chatbot ? (
             <Chatbot api={chatbot} />
