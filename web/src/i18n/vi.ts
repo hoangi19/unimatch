@@ -270,4 +270,10 @@ export const vi: Record<MessageKey, string> = {
   'chatbot.save.failed': 'Không lưu được cài đặt',
   'chatbot.save.invalid': 'Sửa các trường được đánh dấu trước khi lưu',
   'chatbot.save.otherProvider': 'Nhà cung cấp {name} cũng có lỗi. Chọn nó để sửa.',
+  'health.noPages': 'Chưa kết nối Trang',
+  'health.healthy': 'Ổn định · {n} Trang',
+  'health.invalid': 'Token lỗi · {n}/{total} Trang',
+  'health.bannerTitle': 'Facebook không còn chấp nhận token của {n} Trang.',
+  'health.bannerBody': 'Bot đã ngừng trả lời trên các Trang này. Kết nối lại để bot hoạt động tiếp.',
+  'health.reconnect': 'Kết nối lại',
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatbotApi } from './chatbot/api'
 import { Chatbot } from './chatbot/Chatbot'
+import { usePageHealth, type PageHealth } from './health'
 import { LANGS, useI18n, type MessageKey } from './i18n'
 import type { PagesData } from './pages/data'
 import { PagesTab } from './pages/PagesTab'
@@ -24,6 +25,7 @@ export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps
   const [navOpen, setNavOpen] = useState(false)
   const closeNav = useRef<HTMLButtonElement>(null)
   const title = t(`tab.${tab}`)
+  const health = usePageHealth(pagesData, tab)
 
   useEffect(() => {
     document.title = `${title} · UniMatch`
@@ -67,7 +69,8 @@ export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps
       <div className="scrim" onClick={() => setNavOpen(false)} />
       <div className="main">
         <Topbar tab={tab} title={title} onOpenNav={() => setNavOpen(true)} navOpen={navOpen} onSignOut={onSignOut} />
-        <StatusBar status={status} />
+        <StatusBar status={status} health={health} />
+        {!!health?.invalid && tab !== 'pages' && <HealthBanner invalid={health.invalid} onReconnect={() => go('pages')} />}
         <main className="view">
           {tab === 'pages' && pagesData ? (
             <PagesTab data={pagesData} />
@@ -185,12 +188,21 @@ export function ThemeButton({ theme, onToggle }: { theme: Theme; onToggle: () =>
   )
 }
 
-function StatusBar({ status }: { status: SystemStatus }) {
+function StatusBar({ status, health }: { status: SystemStatus; health: PageHealth | null }) {
   const { t } = useI18n()
   const unknown = t('status.unknown')
   const bot = status.botOn === undefined ? unknown : t(status.botOn ? 'status.on' : 'status.paused')
-  const items: [IconName, MessageKey, string, boolean][] = [
-    ['webhook', 'status.webhook', status.webhook ?? unknown, status.webhook !== undefined],
+  const pages =
+    health &&
+    (!health.total
+      ? t('health.noPages')
+      : health.invalid
+        ? t('health.invalid', { n: health.invalid, total: health.total })
+        : t('health.healthy', { n: health.total }))
+  // An explicit webhook status wins; otherwise show Page token health.
+  const webhookLive = status.webhook !== undefined || (health ? (health.invalid ? 'bad' : health.total > 0) : false)
+  const items: [IconName, MessageKey, string, boolean | 'bad'][] = [
+    ['webhook', 'status.webhook', status.webhook ?? pages ?? unknown, webhookLive],
     ['sparkles', 'status.ai', status.ai ?? unknown, status.ai !== undefined],
     ['bot', 'status.bot', bot, status.botOn === true],
   ]
@@ -198,13 +210,28 @@ function StatusBar({ status }: { status: SystemStatus }) {
     <section className="status-strip" aria-label={t('status.aria')}>
       {items.map(([icon, key, value, live]) => (
         <span key={key} className="status-item">
-          <span className={live ? 'pulse' : 'pulse off'} aria-hidden="true" />
+          <span className={live === 'bad' ? 'pulse bad' : live ? 'pulse' : 'pulse off'} aria-hidden="true" />
           <Icon name={icon} />
           <span className="k">{t(key)}</span>
           <span className="v">{value}</span>
         </span>
       ))}
     </section>
+  )
+}
+
+function HealthBanner({ invalid, onReconnect }: { invalid: number; onReconnect: () => void }) {
+  const { t } = useI18n()
+  return (
+    <div className="health-banner callout callout-danger" role="alert">
+      <Icon name="alert" />
+      <div className="callout-body">
+        <strong>{t('health.bannerTitle', { n: invalid })}</strong> {t('health.bannerBody')}
+      </div>
+      <Button size="sm" icon="rotate" onClick={onReconnect}>
+        {t('health.reconnect')}
+      </Button>
+    </div>
   )
 }
 
