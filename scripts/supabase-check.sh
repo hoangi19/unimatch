@@ -10,6 +10,6 @@ for fn in supabase/functions/*/index.ts; do
   deno check "$fn"
 done
 
-deno check scripts/seed.ts
+deno check scripts/seed.ts scripts/import-jobs.ts
 
 deno test --permit-no-files scripts supabase/functions
