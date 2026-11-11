@@ -174,6 +174,84 @@ export type Database = {
           },
         ]
       }
+      jobs: {
+        Row: {
+          applicants_count: number | null
+          apply_url: string | null
+          benefits: string[]
+          company_linkedin_url: string | null
+          company_logo: string | null
+          company_name: string | null
+          created_at: string
+          description_html: string | null
+          description_text: string | null
+          employment_type: string | null
+          external_id: string
+          industries: string | null
+          link: string | null
+          location: string | null
+          posted_at: string | null
+          raw: Json
+          salary: string | null
+          scraped_at: string | null
+          seniority_level: string | null
+          source: string
+          source_name: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          applicants_count?: number | null
+          apply_url?: string | null
+          benefits?: string[]
+          company_linkedin_url?: string | null
+          company_logo?: string | null
+          company_name?: string | null
+          created_at?: string
+          description_html?: string | null
+          description_text?: string | null
+          employment_type?: string | null
+          external_id: string
+          industries?: string | null
+          link?: string | null
+          location?: string | null
+          posted_at?: string | null
+          raw: Json
+          salary?: string | null
+          scraped_at?: string | null
+          seniority_level?: string | null
+          source: string
+          source_name?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          applicants_count?: number | null
+          apply_url?: string | null
+          benefits?: string[]
+          company_linkedin_url?: string | null
+          company_logo?: string | null
+          company_name?: string | null
+          created_at?: string
+          description_html?: string | null
+          description_text?: string | null
+          employment_type?: string | null
+          external_id?: string
+          industries?: string | null
+          link?: string | null
+          location?: string | null
+          posted_at?: string | null
+          raw?: Json
+          salary?: string | null
+          scraped_at?: string | null
+          seniority_level?: string | null
+          source?: string
+          source_name?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           admin_id: string | null
