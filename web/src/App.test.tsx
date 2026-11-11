@@ -80,3 +80,20 @@ it('dismisses toasts after a timeout', () => {
   expect(screen.queryByText('Saved')).toBeNull()
   vi.useRealTimers()
 })
+
+it('serves the legal pages without a session, in both languages', () => {
+  const signedOut = stubAuth(null).auth
+  history.replaceState(null, '', '/privacy')
+  const { unmount } = render(<App auth={signedOut} />)
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Chính sách quyền riêng tư')
+  expect(screen.queryByLabelText('Mật khẩu')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'EN' }))
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Privacy policy')
+  expect(location.pathname).toBe('/privacy')
+  unmount()
+
+  history.replaceState(null, '', '/data-deletion/')
+  render(<App auth={signedOut} />)
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Data deletion')
+  expect(screen.getByText(/Delete my data/)).toBeTruthy()
+})
