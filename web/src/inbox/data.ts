@@ -3,7 +3,7 @@ import type { Translate } from '../i18n'
 import type { Json, Tables } from '../lib/database.types'
 
 export const CONVERSATION_COLUMNS =
-  'id, page_id, psid, customer_name, customer_picture_url, status, last_message_at, last_message_preview, unread_count, handoff_reason'
+  'id, page_id, psid, customer_name, customer_picture_url, status, last_message_at, last_message_preview, unread_count, handoff_reason, last_customer_message_at'
 export type ConversationRow = Pick<
   Tables<'conversations'>,
   | 'id'
@@ -16,11 +16,29 @@ export type ConversationRow = Pick<
   | 'last_message_preview'
   | 'unread_count'
   | 'handoff_reason'
+  | 'last_customer_message_at'
 >
 export type MessageRow = Tables<'messages'>
 export type InboxPage = Pick<Tables<'pages'>, 'id' | 'name'>
 /** Keyset cursor: the oldest message already shown. */
 export type Cursor = { createdAt: string; id: string }
+/** What the admin can set from the thread header. Reopen is 'bot'. */
+export type Mode = 'human' | 'bot' | 'closed'
+export const SEND_ERRORS = ['not_found', 'outside_window', 'token_invalid', 'rate_limit', 'user_unavailable', 'send_failed'] as const
+export type SendErrorKind = (typeof SEND_ERRORS)[number]
+/** The send-message function's answer. messageId is the stored row, null when nothing was stored. */
+export type SendResult = { ok: true; messageId: string | null } | { ok: false; messageId: string | null; error: { kind: SendErrorKind; message: string } }
+
+/** Maps the function's `{ok, message_id, error}` body; anything else is a generic failure. */
+export function toSendResult(body: unknown): SendResult {
+  const b = body && typeof body === 'object' ? (body as { ok?: unknown; message_id?: unknown; error?: { kind?: unknown; message?: unknown } }) : {}
+  const messageId = typeof b.message_id === 'string' ? b.message_id : null
+  if (b.ok === true) return { ok: true, messageId }
+  const kind = b.error?.kind
+  if (b.ok === false && (SEND_ERRORS as readonly unknown[]).includes(kind))
+    return { ok: false, messageId, error: { kind: kind as SendErrorKind, message: String(b.error?.message ?? '') } }
+  return { ok: false, messageId: null, error: { kind: 'send_failed', message: 'Unexpected response' } }
+}
 
 export type InboxData = {
   /** Each method throws on a database error. */
@@ -35,6 +53,11 @@ export type InboxData = {
   subscribe(listener: LiveListener): () => void
   loadDetails(conversationId: string): Promise<ConversationDetails>
   saveNotes(conversationId: string, notes: string): Promise<void>
+  /** Changes the status through set_conversation_mode, which writes the system event. */
+  setMode(conversationId: string, mode: Mode): Promise<void>
+  /** Never throws: a transport error is a `send_failed` result. `retryOf` is the failed row this attempt replaces. */
+  send(conversationId: string, text: string, retryOf?: string): Promise<SendResult>
+  loadQuickReplies(): Promise<string[]>
 }
 
 /** `resync`: the connection came back and rows may have been missed, so refetch. */
@@ -78,6 +101,10 @@ export type Status = (typeof STATUSES)[number]
 export const FILTERS = ['all', ...STATUSES] as const
 export type Filter = (typeof FILTERS)[number]
 
+// Messenger only accepts standard replies within 24 hours of the customer's last message.
+export const WINDOW_MS = 24 * 60 * 60 * 1000
+export const windowOpen = (lastCustomerMessageAt: string | null, now = Date.now()) => now - time(lastCustomerMessageAt) < WINDOW_MS
+
 export const isStatus = (value: string): value is Status => (STATUSES as readonly string[]).includes(value)
 
 const time = (iso: string | null) => (iso ? Date.parse(iso) : -Infinity)
@@ -111,7 +138,7 @@ export function mergeMessages(current: MessageRow[], incoming: MessageRow[]): Me
   return [...byId.values()].sort((a, b) => time(a.created_at) - time(b.created_at) || a.id.localeCompare(b.id))
 }
 
-export const EVENT_CODES = ['handoff', 'takeover', 'return_to_bot'] as const
+export const EVENT_CODES = ['handoff', 'takeover', 'return_to_bot', 'close', 'reopen'] as const
 export const EVENT_REASONS = ['keyword', 'send_failed', 'bot_error', 'low_confidence', 'complaint'] as const
 export type SystemEvent = {
   code: (typeof EVENT_CODES)[number] | 'other'

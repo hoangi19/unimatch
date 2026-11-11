@@ -7,6 +7,9 @@ import { handle } from "./handler.ts";
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const messenger = messengerDeps(db);
 
+const failedAdmin = <Q extends { eq(column: string, value: string): Q }>(query: Q, id: string, conversationId: string) =>
+  query.eq("id", id).eq("conversation_id", conversationId).eq("sender_kind", "admin").eq("delivery_status", "failed");
+
 Deno.serve((req) =>
   handle(req, {
     getUser: async (token) => (await db.auth.getUser(token)).data.user,
@@ -20,6 +23,15 @@ Deno.serve((req) =>
       const { error } = await db.rpc("set_conversation_mode_as", {
         p_conversation_id: conversationId, p_mode: "human", p_admin_id: adminId,
       });
+      if (error) throw new Error(error.message);
+    },
+    isFailedAdminMessage: async (id, conversationId) => {
+      const { data, error } = await failedAdmin(db.from("messages").select("id"), id, conversationId).maybeSingle();
+      if (error) throw new Error("could not load the retried message");
+      return data !== null;
+    },
+    deleteFailedAdminMessage: async (id, conversationId) => {
+      const { error } = await failedAdmin(db.from("messages").delete(), id, conversationId);
       if (error) throw new Error(error.message);
     },
   })

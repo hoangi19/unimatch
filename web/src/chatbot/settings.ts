@@ -155,7 +155,8 @@ export function validate(draft: Draft): Errors {
 }
 
 export type ProviderUpdate = Pick<ProviderRow, 'display_name' | 'base_url' | 'model' | 'supports_tools'> & { extra_headers: Json }
-export type SettingsUpdate = Omit<SettingsRow, 'id' | 'guardrails'> & { guardrails: Json }
+// This form does not edit quick replies yet; the Inbox only reads them.
+export type SettingsUpdate = Omit<SettingsRow, 'id' | 'guardrails' | 'quick_replies'> & { guardrails: Json }
 export type SavePlan = {
   providers: { kind: ProviderKind; update: ProviderUpdate }[]
   keys: { kind: ProviderKind; key: string | null }[]

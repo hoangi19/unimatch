@@ -14,6 +14,7 @@ import {
   type InboxData,
   type InboxPage,
 } from './data'
+import { Composer } from './Composer'
 import { CustomerInfo } from './CustomerInfo'
 import { Avatar, StatusBadge, Thread } from './Thread'
 import { useWide } from './useWide'
@@ -198,7 +199,15 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
         </section>
         <section className="ib-thread" aria-label={t('inbox.threadPane')}>
           {selected ? (
-            <Thread key={selected.id} data={data} conversation={selected} pageName={pageName(selected.page_id)} onBack={back} />
+            <Thread
+              key={selected.id}
+              data={data}
+              conversation={selected}
+              pageName={pageName(selected.page_id)}
+              onBack={back}
+              onChange={(row) => setLoaded((l) => (l && l !== 'error' ? { ...l, conversations: upsertConversation(l.conversations, row) } : l))}
+              footer={(reply) => <Composer data={data} conversation={selected} {...reply} />}
+            />
           ) : (
             <div className="ib-placeholder">
               <Icon name="inbox" className="ic ic-xl" />

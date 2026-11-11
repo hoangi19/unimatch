@@ -13,6 +13,7 @@ export const SAVED: Saved = {
     handoff_message: 'A person will reply',
     language: 'auto',
     rate_limit_per_hour: 30,
+    quick_replies: [],
     guardrails: { refused_topics: ['Politics'], handoff_on_keyword: true, handoff_on_low_confidence: true, handoff_on_complaint: false },
   },
   providers: [

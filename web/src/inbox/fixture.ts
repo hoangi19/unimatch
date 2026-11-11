@@ -1,6 +1,6 @@
 // Test rows for the Inbox tab.
 import { vi } from 'vitest'
-import { createHub, type ConversationRow, type InboxData, type LiveEvent, type LiveListener, type MessageRow } from './data'
+import { createHub, type ConversationRow, type InboxData, type LiveEvent, type LiveListener, type MessageRow, type SendResult } from './data'
 
 /** Stub data with a live feed; `emit` pushes an event to every subscriber. */
 export function liveData(patch: Partial<InboxData> = {}) {
@@ -18,6 +18,9 @@ export function liveData(patch: Partial<InboxData> = {}) {
     subscribe: vi.fn(subscribe),
     loadDetails: vi.fn(async () => ({ notes: '', language: null, created_at: '2026-11-01T09:00:00Z', stats: { user: 0, bot: 0, admin: 0, handoffs: 0 } })),
     saveNotes: vi.fn(async () => {}),
+    setMode: vi.fn(async () => {}),
+    send: vi.fn(async (): Promise<SendResult> => ({ ok: true, messageId: 'm-sent' })),
+    loadQuickReplies: vi.fn(async () => []),
     ...patch,
   }
   return { data, emit: (event: LiveEvent) => send(event) }
@@ -34,6 +37,7 @@ export const conv = (patch: Partial<ConversationRow> = {}): ConversationRow => (
   last_message_preview: 'Có việc part-time không?',
   unread_count: 0,
   handoff_reason: null,
+  last_customer_message_at: null,
   ...patch,
 })
 
