@@ -1,11 +1,41 @@
 // Supabase adapter for the reply engine. `db` must be the service-role client.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 import { chat } from "../ai/chat.ts";
-import { loadGuardrail, loadProvider } from "../ai/config.ts";
+import { loadEmbedding, loadGuardrail, loadProvider } from "../ai/config.ts";
+import { embed } from "../ai/embed.ts";
 import { decide } from "../ai/quyet.ts";
 import { messengerDeps } from "../messenger/db.ts";
 import { sendText } from "../messenger/send.ts";
-import { type Deps, guardrailState, HISTORY_LIMIT, type Page } from "./engine.ts";
+import { type Deps, guardrailState, HISTORY_LIMIT, type Job, type Page, SEARCH_TIMEOUT_MS } from "./engine.ts";
+
+type Match = {
+  title: string;
+  company_name: string | null;
+  location: string | null;
+  salary: string | null;
+  employment_type: string | null;
+  link: string | null;
+  apply_url: string | null;
+  similarity: number;
+};
+
+// Embeds the query with the job embedding model and returns the nearest jobs (match_jobs). Shared with test-chat.
+export async function searchJobs(db: SupabaseClient, query: string, count: number): Promise<{ model: string; jobs: Job[] }> {
+  const config = await loadEmbedding(db);
+  const { vectors } = await embed(config, [query], SEARCH_TIMEOUT_MS);
+  const { data, error } = await db.rpc("match_jobs", { query_embedding: JSON.stringify(vectors[0]), match_count: count });
+  if (error) throw new Error(`could not search jobs: ${error.message}`);
+  const jobs = (data as Match[]).map((m) => ({
+    title: m.title,
+    company: m.company_name,
+    location: m.location,
+    salary: m.salary,
+    type: m.employment_type,
+    url: m.link ?? m.apply_url,
+    similarity: m.similarity,
+  }));
+  return { model: config.model, jobs };
+}
 
 export function botDeps(db: SupabaseClient): Deps {
   const messenger = messengerDeps(db);
@@ -60,6 +90,7 @@ export function botDeps(db: SupabaseClient): Deps {
       const { earlier, latest } = guardrailState(turn);
       return decide(chat, await loadGuardrail(db), earlier, latest);
     },
+    searchJobs: (query, count) => searchJobs(db, query, count),
     sendText: (pageId, psid, text, sender) => sendText(messenger, pageId, psid, text, sender),
     handOff: async (conversationId, reason, detail) => {
       const { error } = await db.rpc("hand_off_conversation", {

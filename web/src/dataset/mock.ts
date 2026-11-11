@@ -1,4 +1,4 @@
-// Demo-only data for the parts of the Dataset tab that have no backend yet: crawl sources, embedding
+// Demo-only data for the parts of the Dataset tab that have no backend yet: crawl sources, chunking
 // settings, run history and per-job embedding status. Local state only, nothing is sent or saved.
 // Delete this module (with MockCards.tsx and useMock.ts) once the real crawl and embedding land.
 import type { MessageKey } from '../i18n'
@@ -37,14 +37,8 @@ export const MOCK_HISTORY: MockRun[] = [
   { at: NOW - 3 * DAY, source: 's3', status: 'success', found: 74, added: 31, seconds: 98 },
 ]
 
-/** Embedding providers and their models, with vector dimensions. */
-export const EMBED_PROVIDERS: Record<string, { label: string; models: Record<string, number> }> = {
-  openai: { label: 'OpenAI', models: { 'text-embedding-3-small': 1536, 'text-embedding-3-large': 3072 } },
-  cohere: { label: 'Cohere', models: { 'embed-multilingual-v3.0': 1024 } },
-}
-
-export type EmbedSettings = { provider: string; model: string; chunkSize: number; overlap: number; retention: number }
-export const MOCK_EMBED: EmbedSettings = { provider: 'openai', model: 'text-embedding-3-small', chunkSize: 512, overlap: 64, retention: 30 }
+export type ChunkSettings = { chunkSize: number; overlap: number; retention: number }
+export const MOCK_CHUNKING: ChunkSettings = { chunkSize: 512, overlap: 64, retention: 30 }
 
 export type EmbedStatus = 'embedded' | 'pending' | 'failed'
 

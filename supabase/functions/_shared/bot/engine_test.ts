@@ -6,9 +6,13 @@ import {
   buildPrompt,
   DEBOUNCE_MS,
   type Deps,
+  findJobs,
   guardrailState,
   hoursDecision,
+  type Job,
+  jobQuery,
   matchKeyword,
+  MIN_SIMILARITY,
   type Page,
   runBot,
   type Settings,
@@ -80,11 +84,11 @@ function fake(opts: {
 const failedSend: SendResult = { ok: false, error: { kind: "outside_window", message: "too old" } };
 
 // Silences the engine's log lines for one test.
-async function quiet(run: () => Promise<void>) {
+async function quiet<T>(run: () => Promise<T>): Promise<T> {
   const { log, error } = console;
   console.log = console.error = () => {};
   try {
-    await run();
+    return await run();
   } finally {
     Object.assign(console, { log, error });
   }
@@ -404,4 +408,72 @@ Deno.test("guardrailState: earlier messages without the texts this turn answers;
     earlier: [{ from: "customer", text: "hi" }, { from: "bot", text: "hello" }, { from: "bot", text: "staff here" }],
     latest: ["first", "second"],
   });
+});
+
+const JOB: Job = {
+  title: "Nhân viên bảo vệ",
+  company: "A Co",
+  location: "Hà Nội",
+  salary: "8-10 triệu",
+  type: "Full-time",
+  url: "https://example.com/job/1",
+  similarity: 0.8,
+};
+
+Deno.test("job search: matching jobs go under the system prompt and retrieval goes in the trace", () =>
+  quiet(async () => {
+    const f = fake({ turn: { history: [{ sender_kind: "user", text: "tìm việc bảo vệ Hà Nội" }], newCustomerTexts: ["tìm việc bảo vệ Hà Nội"] } });
+    const queries: string[] = [];
+    f.deps.searchJobs = (query) => {
+      queries.push(query);
+      return Promise.resolve({ model: "Vietnamese_Embedding", jobs: [JOB, { ...JOB, title: "Weak match", similarity: MIN_SIMILARITY - 0.01 }] });
+    };
+    await runBot(f.deps, "p1", "u1", 1);
+    assertEquals(queries, ["tìm việc bảo vệ Hà Nội"]);
+    const system = f.prompts[0][0].content;
+    assertStringIncludes(system, "## Matching jobs");
+    assertStringIncludes(system, "1. Nhân viên bảo vệ | A Co | Hà Nội | Lương: 8-10 triệu | Full-time | https://example.com/job/1");
+    assertEquals(system.includes("Weak match"), false);
+    const retrieval = f.sent[0].sender.kind === "bot" ? f.sent[0].sender.trace?.retrieval as Record<string, unknown> : null;
+    assertEquals(retrieval?.model, "Vietnamese_Embedding");
+    assertEquals(retrieval?.count, 1);
+  }));
+
+Deno.test("job search: no match says so, a failure still replies without jobs", () =>
+  quiet(async () => {
+    const none = fake();
+    none.deps.searchJobs = () => Promise.resolve({ model: "m", jobs: [] });
+    await runBot(none.deps, "p1", "u1", 1);
+    assertStringIncludes(none.prompts[0][0].content, "No job in the system matches");
+
+    const broken = fake();
+    broken.deps.searchJobs = () => Promise.reject(new AiError("auth", "API key rejected"));
+    await runBot(broken.deps, "p1", "u1", 1);
+    assertEquals(broken.sent.length, 1);
+    assertEquals(broken.sent[0].text, "Hello!");
+    assertStringIncludes(broken.prompts[0][0].content, "job search is unavailable");
+    const trace = broken.sent[0].sender.kind === "bot" ? broken.sent[0].sender.trace : undefined;
+    assertEquals((trace?.retrieval as Record<string, unknown>).error, "auth");
+    assertEquals(broken.handoffs, []);
+  }));
+
+Deno.test("findJobs: no search wired adds no section; a slow search times out", async () => {
+  assertEquals(await findJobs(undefined, "x"), { jobs: undefined });
+  assertEquals(buildPrompt(SETTINGS, "P", [{ sender_kind: "user", text: "hi" }])[0].content.includes("Matching jobs"), false);
+  // Real timers: the search never settles, so the 5 s timeout fires.
+  const found = await quiet(() => findJobs(() => new Promise(() => {}), "x"));
+  assertEquals(found.jobs, null);
+  assertEquals((found.retrieval as Record<string, unknown>).error, "timeout");
+});
+
+Deno.test("jobQuery: this turn plus two earlier customer messages, newest kept", () => {
+  const history = [
+    { sender_kind: "user", text: "a" },
+    { sender_kind: "user", text: "b" },
+    { sender_kind: "bot", text: "reply" },
+    { sender_kind: "user", text: "c" },
+    { sender_kind: "user", text: "d" },
+  ] as const;
+  assertEquals(jobQuery([...history], ["d"]), "b\nc\nd");
+  assertEquals(jobQuery([{ sender_kind: "user", text: "x".repeat(2_000) }], ["x"]).length, 1_000);
 });

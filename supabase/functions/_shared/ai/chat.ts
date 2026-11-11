@@ -103,7 +103,7 @@ export async function chat(
   }
 }
 
-function statusError(status: number, detail: string): AiError {
+export function statusError(status: number, detail: string): AiError {
   if (status === 401 || status === 403) return new AiError("auth", "API key rejected by the provider");
   if (status === 429) return new AiError("rate_limit", "Rate limited by the provider, try again later");
   if (status === 404) return new AiError("bad_config", `Model or endpoint not found${detail ? `: ${detail}` : ""}`);
@@ -116,7 +116,7 @@ function statusError(status: number, detail: string): AiError {
   return new AiError("provider", `Provider error (HTTP ${status})`);
 }
 
-function errorDetail(text: string): string {
+export function errorDetail(text: string): string {
   try {
     const json = JSON.parse(text);
     const message = json?.error?.message ?? json?.message ?? json?.error;

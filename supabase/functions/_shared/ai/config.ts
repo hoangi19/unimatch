@@ -1,6 +1,7 @@
 // Loads a provider's saved config and its Vault key. `db` must be the service-role client.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 import { AiError, type ProviderConfig, type ProviderKind } from "./chat.ts";
+import type { EmbeddingConfig } from "./embed.ts";
 import { assertPublicHost } from "./host.ts";
 
 export async function loadProvider(db: SupabaseClient, kind: ProviderKind): Promise<ProviderConfig> {
@@ -41,4 +42,15 @@ export async function loadGuardrail(db: SupabaseClient): Promise<ProviderConfig>
   if (keyError) throw new Error("could not read the guardrail key");
   if (!apiKey) throw new AiError("bad_config", "No API key saved for the guardrail model");
   return { kind: "quyet", baseUrl: row.base_url, model: row.model, apiKey, extraHeaders: {}, supportsTools: false };
+}
+
+// The job embedding model's connection (embedding_model row) with its own Vault key; bad_config when none is saved.
+export async function loadEmbedding(db: SupabaseClient): Promise<EmbeddingConfig> {
+  const { data: row, error } = await db.from("embedding_model").select("base_url, model, dims").single();
+  if (error) throw new Error("could not load the embedding model");
+  await assertPublicHost(row.base_url);
+  const { data: apiKey, error: keyError } = await db.rpc("get_embedding_key");
+  if (keyError) throw new Error("could not read the embedding model key");
+  if (!apiKey) throw new AiError("bad_config", "No API key saved for the embedding model");
+  return { baseUrl: row.base_url, model: row.model, dims: row.dims, apiKey };
 }

@@ -564,7 +564,7 @@ export const en = {
   'dataset.hist.e429': 'The source returned HTTP 429 (rate limited). Retried 3 times, then gave up.',
   'dataset.hist.ePartial': '38 listings skipped: description missing.',
   'dataset.emb.title': 'Embedding settings',
-  'dataset.emb.sub': 'How job posts are chunked and stored in pgvector.',
+  'dataset.emb.sub': "The model that turns job posts into vectors for the bot's job search.",
   'dataset.emb.provider': 'Embedding provider',
   'dataset.emb.model': 'Embedding model',
   'dataset.emb.dims': '{n} dims',
@@ -612,6 +612,19 @@ export const en = {
   'guardrail.noConfidence': 'The model returns one choice and no confidence. Uses the saved config.',
   'guardrail.err.long': '2,000 characters at most.',
   'inbox.reason.human_request': 'customer asked for a person',
+  'dataset.emb.baseUrl': 'Base URL',
+  'dataset.emb.dimsLabel': 'Vector size',
+  'dataset.emb.dimsHint': 'Fixed by the database. Test connection checks that the model returns this size.',
+  'dataset.emb.save': 'Save',
+  'dataset.emb.saved': 'Embedding settings saved',
+  'dataset.emb.saveError': 'Could not save: {message}',
+  'dataset.emb.loadError': 'Could not load the embedding settings.',
+  'dataset.emb.testOk': 'Connected · {dims} dims · {ms} ms',
+  'dataset.emb.chunking': 'Chunking and re-index',
+  'dataset.emb.err.baseUrl': 'Enter an https:// URL.',
+  'dataset.emb.err.model': 'Enter a model ID (up to 200 characters).',
+  'dataset.emb.err.key': 'A key is 8 to 512 characters without spaces.',
+  'dataset.stat.embedded': 'Embedded',
 }
 
 export type MessageKey = keyof typeof en

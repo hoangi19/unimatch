@@ -142,3 +142,21 @@ Deno.test("provider errors are ok:false; unexpected errors are 500 with a generi
   }
 });
 
+
+Deno.test("the dry run uses the live job search and shows retrieval in the trace", async () => {
+  const queries: string[] = [];
+  const { d, calls } = deps({
+    searchJobs: (query) => {
+      queries.push(query);
+      return Promise.resolve({
+        model: "Vietnamese_Embedding",
+        jobs: [{ title: "Data analyst", company: "A Co", location: "HCM", salary: null, type: null, url: "https://example.com/j", similarity: 0.7 }],
+      });
+    },
+  });
+  const body = await (await handle(post("admin-token"), d)).json();
+  assertEquals(queries, ["Có việc data ở HCM không?"]);
+  assertEquals(body.trace.retrieval.count, 1);
+  assertEquals(body.trace.retrieval.model, "Vietnamese_Embedding");
+  assertEquals(calls[0].messages[0].content.includes("1. Data analyst | A Co | HCM | https://example.com/j"), true);
+});

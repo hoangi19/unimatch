@@ -177,6 +177,39 @@ export type Database = {
           },
         ]
       }
+      embedding_model: {
+        Row: {
+          base_url: string
+          dims: number
+          id: boolean
+          key_hint: string | null
+          key_saved_at: string | null
+          key_secret_id: string | null
+          model: string
+          provider: string
+        }
+        Insert: {
+          base_url?: string
+          dims?: number
+          id?: boolean
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          model?: string
+          provider?: string
+        }
+        Update: {
+          base_url?: string
+          dims?: number
+          id?: boolean
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          model?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       guardrail_model: {
         Row: {
           base_url: string
@@ -206,6 +239,44 @@ export type Database = {
           provider?: string
         }
         Relationships: []
+      }
+      job_chunks: {
+        Row: {
+          chunk_index: number
+          content_hash: string
+          created_at: string
+          embedding: string
+          external_id: string
+          model: string
+          source: string
+        }
+        Insert: {
+          chunk_index: number
+          content_hash: string
+          created_at?: string
+          embedding: string
+          external_id: string
+          model: string
+          source: string
+        }
+        Update: {
+          chunk_index?: number
+          content_hash?: string
+          created_at?: string
+          embedding?: string
+          external_id?: string
+          model?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_chunks_source_external_id_fkey"
+            columns: ["source", "external_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["source", "external_id"]
+          },
+        ]
       }
       jobs: {
         Row: {
@@ -442,6 +513,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_up_to: string }
         Returns: boolean
       }
+      get_embedding_key: { Args: never; Returns: string }
       get_guardrail_key: { Args: never; Returns: string }
       get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_provider_key: {
@@ -463,6 +535,21 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      match_jobs: {
+        Args: { match_count: number; query_embedding: string }
+        Returns: {
+          apply_url: string
+          company_name: string
+          employment_type: string
+          external_id: string
+          link: string
+          location: string
+          salary: string
+          similarity: number
+          source: string
+          title: string
+        }[]
+      }
       process_webhook_event: {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
         Returns: string
@@ -483,6 +570,7 @@ export type Database = {
         Args: { p_page_id: string; p_valid: boolean }
         Returns: undefined
       }
+      remove_embedding_key: { Args: never; Returns: undefined }
       remove_guardrail_key: { Args: never; Returns: undefined }
       remove_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
@@ -496,6 +584,13 @@ export type Database = {
       set_conversation_mode_as: {
         Args: { p_admin_id: string; p_conversation_id: string; p_mode: string }
         Returns: boolean
+      }
+      set_embedding_key: {
+        Args: { p_key: string }
+        Returns: {
+          key_hint: string
+          key_saved_at: string
+        }[]
       }
       set_guardrail_key: {
         Args: { p_key: string }

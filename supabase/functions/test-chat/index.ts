@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { AiError, chat } from "../_shared/ai/chat.ts";
 import { loadKey } from "../_shared/ai/config.ts";
 import { assertPublicHost } from "../_shared/ai/host.ts";
+import { searchJobs } from "../_shared/bot/db.ts";
 import { withCors } from "../_shared/cors.ts";
 import { handle } from "./handler.ts";
 
@@ -21,5 +22,6 @@ Deno.serve(withCors((req) =>
     },
     loadKey: (kind) => loadKey(db, kind),
     chat,
+    searchJobs: (query, count) => searchJobs(db, query, count),
   })
 ));
