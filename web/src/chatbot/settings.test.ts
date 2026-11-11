@@ -7,7 +7,7 @@ it('round-trips saved rows with no changes and no errors', () => {
   expect(changes(toDraft(SAVED), draft)).toEqual([])
   expect(validate(draft)).toEqual({})
   expect(draft.providers.custom.headers).toEqual([{ name: 'X-Api-Version', value: '1' }])
-  expect(savePlan(toDraft(SAVED), draft)).toEqual({ providers: [], keys: [], settings: null })
+  expect(savePlan(toDraft(SAVED), draft)).toEqual({ providers: [], keys: [], settings: null, guardrail: null })
 })
 
 it('mirrors the table checks', () => {
@@ -60,4 +60,32 @@ it('plans provider rows, keys, then settings', () => {
     { kind: 'anthropic', key: 'sk-ant-fake-key-1234' },
   ])
   expect(plan.settings).toMatchObject({ active_provider: 'anthropic', max_tokens: 512, rate_limit_per_hour: 30 })
+})
+
+it('keeps every guardrail key when saving and validates the guardrail model', () => {
+  const draft = toDraft(SAVED)
+  expect(draft.settings.guardrails).toEqual(SAVED.settings.guardrails)
+  draft.guardrail.base_url = 'http://mkp-api.fptcloud.com/v1'
+  draft.guardrail.model = ' '
+  draft.guardrail.key = 'short'
+  draft.settings.guardrails.off_topic_message = 'x'.repeat(2001)
+  expect(validate(draft)).toEqual({
+    'guardrail.base_url': 'chatbot.err.url',
+    'guardrail.model': 'chatbot.err.required',
+    'guardrail.key': 'chatbot.err.key',
+    'settings.guardrails.off_topic_message': 'guardrail.err.long',
+  })
+})
+
+it('plans the guardrail row, key and removal separately from providers', () => {
+  const draft = toDraft(SAVED)
+  draft.guardrail.removeKey = true
+  expect(savePlan(toDraft(SAVED), draft)).toMatchObject({ guardrail: null, guardrailKey: null, keys: [], settings: null })
+  draft.guardrail.removeKey = false
+  draft.guardrail.key = ' fpt-fake-test-1234 '
+  draft.guardrail.model = 'Quyet-1.0-Large-v2'
+  expect(savePlan(toDraft(SAVED), draft)).toMatchObject({
+    guardrail: { base_url: 'https://mkp-api.fptcloud.com/v1', model: 'Quyet-1.0-Large-v2' },
+    guardrailKey: 'fpt-fake-test-1234',
+  })
 })

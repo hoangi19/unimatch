@@ -177,6 +177,36 @@ export type Database = {
           },
         ]
       }
+      guardrail_model: {
+        Row: {
+          base_url: string
+          id: boolean
+          key_hint: string | null
+          key_saved_at: string | null
+          key_secret_id: string | null
+          model: string
+          provider: string
+        }
+        Insert: {
+          base_url?: string
+          id?: boolean
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          model?: string
+          provider?: string
+        }
+        Update: {
+          base_url?: string
+          id?: boolean
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          model?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       jobs: {
         Row: {
           applicants_count: number | null
@@ -413,6 +443,7 @@ export type Database = {
         Returns: boolean
       }
       get_page_token: { Args: { p_page_id: string }; Returns: string }
+      get_guardrail_key: { Args: never; Returns: string }
       get_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: string
@@ -452,6 +483,7 @@ export type Database = {
         Args: { p_page_id: string; p_valid: boolean }
         Returns: undefined
       }
+      remove_guardrail_key: { Args: never; Returns: undefined }
       remove_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: undefined
@@ -468,6 +500,13 @@ export type Database = {
       set_page_token: {
         Args: { p_expires_at: string; p_page_id: string; p_token: string }
         Returns: undefined
+      }
+      set_guardrail_key: {
+        Args: { p_key: string }
+        Returns: {
+          key_hint: string
+          key_saved_at: string
+        }[]
       }
       set_provider_key: {
         Args: {

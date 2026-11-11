@@ -32,7 +32,7 @@ export async function loadKey(db: SupabaseClient, kind: ProviderKind): Promise<s
   return apiKey;
 }
 
-// The guardrail model's connection and Vault key (guardrail_model row); bad_config when no key is saved.
+// The guardrail model's connection (guardrail_model row) and its own Vault key; bad_config when no key is saved.
 export async function loadGuardrail(db: SupabaseClient): Promise<ProviderConfig> {
   const { data: row, error } = await db.from("guardrail_model").select("base_url, model").single();
   if (error) throw new Error("could not load the guardrail model");

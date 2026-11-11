@@ -5,6 +5,10 @@ import type { Draft, ProviderKind, Saved, SavePlan } from './settings'
 
 export type TestErrorKind = 'auth' | 'rate_limit' | 'timeout' | 'bad_config' | 'bad_request' | 'provider' | 'refused'
 export type TestResult = { ok: true; latencyMs: number; model: string } | { ok: false; error: { kind: TestErrorKind; message: string } }
+export type GuardrailDecision = 'normal' | 'complaint' | 'human_request' | 'off_topic_or_abuse'
+export type GuardrailResult =
+  | { ok: true; latencyMs: number; model: string; decision: GuardrailDecision }
+  | { ok: false; error: { kind: TestErrorKind; message: string } }
 
 export type TestPage = { id: string; name: string; handoff_keywords: string[] }
 export type ChatTurn = { role: 'user' | 'bot'; text: string }
@@ -30,6 +34,8 @@ export type ChatbotApi = {
   save(plan: SavePlan): Promise<void>
   /** `test-connection` Edge Function: checks the provider's saved config. */
   testConnection(kind: ProviderKind): Promise<TestResult>
+  /** `test-connection` for the saved guardrail model: its decision for `text`, or for a built-in sample. */
+  testGuardrail(text?: string): Promise<GuardrailResult>
   /** Pages the test chat can play, for the prompt's page name and handoff keywords. */
   loadPages(): Promise<TestPage[]>
   /** `test-chat` Edge Function: one dry-run reply with the draft; nothing reaches Messenger. */
@@ -39,13 +45,15 @@ export type ChatbotApi = {
 export function createChatbotApi(db: SupabaseClient<Database>): ChatbotApi {
   return {
     async load() {
-      const [settings, providers] = await Promise.all([
+      const [settings, providers, guardrail] = await Promise.all([
         db.from('bot_settings').select('*').single(),
         db.from('ai_providers').select('*'),
+        db.from('guardrail_model').select('*').single(),
       ])
       if (settings.error) throw settings.error
       if (providers.error) throw providers.error
-      return { settings: settings.data, providers: providers.data }
+      if (guardrail.error) throw guardrail.error
+      return { settings: settings.data, providers: providers.data, guardrail: guardrail.data }
     },
     async save(plan) {
       for (const { kind, update } of plan.providers) {
@@ -58,6 +66,16 @@ export function createChatbotApi(db: SupabaseClient<Database>): ChatbotApi {
           : await db.rpc('set_provider_key', { p_kind: kind, p_key: key })
         if (error) throw new Error(error.message)
       }
+      if (plan.guardrail) {
+        const { error } = await db.from('guardrail_model').update(plan.guardrail).eq('id', true)
+        if (error) throw error
+      }
+      if (plan.guardrailKey !== undefined) {
+        const { error } = plan.guardrailKey === null
+          ? await db.rpc('remove_guardrail_key')
+          : await db.rpc('set_guardrail_key', { p_key: plan.guardrailKey })
+        if (error) throw new Error(error.message)
+      }
       if (plan.settings) {
         const { error } = await db.from('bot_settings').update(plan.settings).eq('id', true)
         if (error) throw error
@@ -65,6 +83,10 @@ export function createChatbotApi(db: SupabaseClient<Database>): ChatbotApi {
     },
     async testConnection(kind) {
       const { data } = await db.functions.invoke<TestResult>('test-connection', { body: { kind } })
+      return data && typeof data.ok === 'boolean' ? data : { ok: false, error: { kind: 'provider', message: 'Unexpected response' } }
+    },
+    async testGuardrail(text) {
+      const { data } = await db.functions.invoke<GuardrailResult>('test-connection', { body: { kind: 'quyet', text } })
       return data && typeof data.ok === 'boolean' ? data : { ok: false, error: { kind: 'provider', message: 'Unexpected response' } }
     },
     async loadPages() {

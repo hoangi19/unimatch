@@ -3,7 +3,7 @@ import { useI18n, type MessageKey } from '../i18n'
 import { Button, Input, Skeleton } from '../ui/controls'
 import { Icon, type IconName } from '../ui/Icon'
 import { useToast } from '../ui/toast-context'
-import type { ChatbotApi, TestResult } from './api'
+import type { ChatbotApi, GuardrailResult, TestResult } from './api'
 import './chatbot.css'
 import { TestChat } from './TestChat'
 import {
@@ -21,6 +21,8 @@ import {
   validate,
   type Draft,
   type Errors,
+  type GuardrailForm,
+  type GuardrailRow,
   type Guardrails,
   type ProviderForm,
   type ProviderKind,
@@ -43,7 +45,10 @@ const HERMES_URLS: [MessageKey, string][] = [
 ]
 // Only variables the reply engine fills in.
 const PROMPT_VARS = ['{{page_name}}']
-const HANDOFF_RULES = ['handoff_on_keyword', 'handoff_on_low_confidence', 'handoff_on_complaint'] as const
+// Complaints are a model guardrail check (ModelGuardrail below): nothing else detects them.
+const HANDOFF_RULES = ['handoff_on_keyword', 'handoff_on_low_confidence'] as const
+const MODEL_CHECKS = ['handoff_on_complaint', 'handoff_on_human_request', 'refuse_off_topic'] as const
+const MODEL_ERRORS = ['reply', 'handoff'] as const
 
 /** DOM id of the control for a draft path, so validation can focus it. */
 const fieldId = (path: string) => `cb-${path.replace(/\./g, '-')}`
@@ -136,6 +141,7 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
   const err = (path: string) => (errors[path] ? t(errors[path]) : undefined)
   const setSettings = (patch: Partial<SettingsForm>) => setDraft({ ...draft, settings: { ...draft.settings, ...patch } })
   const setGuardrails = (patch: Partial<Guardrails>) => setSettings({ guardrails: { ...draft.settings.guardrails, ...patch } })
+  const setGuardrail = (patch: Partial<GuardrailForm>) => setDraft({ ...draft, guardrail: { ...draft.guardrail, ...patch } })
   const setProvider = (kind: ProviderKind, patch: Partial<ProviderForm>) =>
     setDraft({ ...draft, providers: { ...draft.providers, [kind]: { ...draft.providers[kind], ...patch } } })
   const rows = Object.fromEntries(saved.providers.map((row) => [row.kind, row])) as Record<ProviderKind, ProviderRow>
@@ -153,7 +159,7 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
     const paths = Object.keys(found)
     if (paths.length) {
       pendingFocus.current = true
-      const hidden = paths.map((path) => path.split('.')[0]).find((kind) => kind !== 'settings' && kind !== active)
+      const hidden = paths.map((path) => path.split('.')[0]).find((kind) => kind !== 'settings' && kind !== 'guardrail' && kind !== active)
       toast({
         kind: 'error',
         title: t('chatbot.save.invalid'),
@@ -408,6 +414,17 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
             </fieldset>
             <Area path="settings.handoff_message" label={t('chatbot.guard.handoffMsg')} value={s.handoff_message} error={err('settings.handoff_message')} onChange={(handoff_message) => setSettings({ handoff_message })} />
           </Card>
+
+          <ModelGuardrail
+            api={api}
+            row={saved.guardrail}
+            form={draft.guardrail}
+            guardrails={s.guardrails}
+            errors={errors}
+            dirty={dirty}
+            onForm={setGuardrail}
+            onGuardrails={setGuardrails}
+          />
         </div>
         <TestChat api={api} draft={draft} dirty={dirty} />
       </div>
@@ -468,7 +485,14 @@ function Examples({ items, current, onPick, mono }: { items: { label: string; va
   )
 }
 
-type KeyFieldProps = { id: string; row: ProviderRow; form: ProviderForm; error?: string; onChange: (patch: Partial<ProviderForm>) => void }
+type KeyForm = Pick<ProviderForm, 'key' | 'removeKey'>
+type KeyFieldProps = {
+  id: string
+  row: Pick<ProviderRow, 'key_hint' | 'key_saved_at'>
+  form: KeyForm
+  error?: string
+  onChange: (patch: Partial<KeyForm>) => void
+}
 
 /** Write-only: the saved key is shown only as its hint; a new key lives in the draft until Save sends it. */
 function KeyField({ id, row, form, error, onChange }: KeyFieldProps) {
@@ -555,6 +579,142 @@ function KeyField({ id, row, form, error, onChange }: KeyFieldProps) {
   )
 }
 
+type ModelGuardrailProps = {
+  api: ChatbotApi
+  row: GuardrailRow
+  form: GuardrailForm
+  guardrails: Guardrails
+  errors: Errors
+  dirty: boolean
+  onForm: (patch: Partial<GuardrailForm>) => void
+  onGuardrails: (patch: Partial<Guardrails>) => void
+}
+
+type Decided = { status: 'loading' } | { status: 'done'; result: GuardrailResult }
+
+/** Quyet on FPT AI Marketplace: one decision per turn before the reply model. Tests use the saved config. */
+function ModelGuardrail({ api, row, form, guardrails: g, errors, dirty, onForm, onGuardrails }: ModelGuardrailProps) {
+  const { t, fmt } = useI18n()
+  const [conn, setConn] = useState<Decided>()
+  const [sample, setSample] = useState('')
+  const [tried, setTried] = useState<Decided>()
+  const err = (path: string) => (errors[path] ? t(errors[path]) : undefined)
+  const run = async (text: string | undefined, set: (d: Decided) => void) => {
+    set({ status: 'loading' })
+    const result = await api.testGuardrail(text).catch(
+      (): GuardrailResult => ({ ok: false, error: { kind: 'provider', message: 'Network error' } }),
+    )
+    set({ status: 'done', result })
+  }
+
+  return (
+    <Card icon="shield" title={t('guardrail.title')} sub={t('guardrail.sub')}>
+      <label className="check">
+        <input type="checkbox" checked={g.model_enabled} onChange={(e) => onGuardrails({ model_enabled: e.target.checked })} />
+        <span>
+          <span className="check-title">{t('guardrail.enable')}</span>
+          <br />
+          <span className="hint">{t('guardrail.enableHint')}</span>
+        </span>
+      </label>
+      <div className="field">
+        <span className="label">{t('guardrail.provider')}</span>
+        <div className="input readonly-box">{t('guardrail.providerName')}</div>
+      </div>
+      <div className="grid-2">
+        <Input
+          id={fieldId('guardrail.base_url')}
+          className="input mono"
+          label={t('chatbot.ai.baseUrl')}
+          autoComplete="off"
+          spellCheck={false}
+          value={form.base_url}
+          error={err('guardrail.base_url')}
+          onChange={(e) => onForm({ base_url: e.target.value })}
+        />
+        <Input
+          id={fieldId('guardrail.model')}
+          className="input mono"
+          label={t('chatbot.ai.model')}
+          autoComplete="off"
+          spellCheck={false}
+          value={form.model}
+          error={err('guardrail.model')}
+          onChange={(e) => onForm({ model: e.target.value })}
+        />
+      </div>
+      <KeyField key={row.key_saved_at ?? 'none'} id={fieldId('guardrail.key')} row={row} form={form} error={err('guardrail.key')} onChange={onForm} />
+      <fieldset className="plain field">
+        <legend className="label">{t('guardrail.checks')}</legend>
+        {MODEL_CHECKS.map((check) => (
+          <label key={check} className="check">
+            <input type="checkbox" checked={g[check]} onChange={(e) => onGuardrails({ [check]: e.target.checked })} />
+            <span>
+              <span className="check-title">{t(`guardrail.${check}`)}</span>
+              <br />
+              <span className="hint">{t(`guardrail.${check}.hint`)}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {g.refuse_off_topic && (
+        <Area
+          path="settings.guardrails.off_topic_message"
+          label={t('guardrail.offTopicMsg')}
+          value={g.off_topic_message}
+          error={err('settings.guardrails.off_topic_message')}
+          onChange={(off_topic_message) => onGuardrails({ off_topic_message })}
+        />
+      )}
+      <fieldset className="plain field">
+        <legend className="label">{t('guardrail.onError')}</legend>
+        <div className="segmented">
+          {MODEL_ERRORS.map((mode) => (
+            <label key={mode}>
+              <input type="radio" name="cb-model-error" value={mode} checked={g.on_model_error === mode} onChange={() => onGuardrails({ on_model_error: mode })} />
+              <span>{t(`guardrail.onError.${mode}`)}</span>
+            </label>
+          ))}
+        </div>
+        <p className="hint">{t('guardrail.onErrorHint')}</p>
+      </fieldset>
+      <div className="conn-row">
+        <Button icon={conn?.status === 'loading' ? undefined : 'sparkles'} disabled={conn?.status === 'loading'} onClick={() => void run(undefined, setConn)}>
+          {conn?.status === 'loading' && <Spinner />}
+          {t('chatbot.conn.test')}
+        </Button>
+        <span aria-live="polite">
+          <ConnStatus conn={conn} />
+        </span>
+      </div>
+      <form
+        className="field"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (sample.trim()) void run(sample.trim(), setTried)
+        }}
+      >
+        <label htmlFor="cb-guardrail-try">{t('guardrail.try')}</label>
+        <div className="input-group">
+          <input id="cb-guardrail-try" className="input" value={sample} maxLength={2000} placeholder={t('guardrail.tryPh')} onChange={(e) => setSample(e.target.value)} />
+          <Button type="submit" disabled={!sample.trim() || tried?.status === 'loading'}>
+            {tried?.status === 'loading' && <Spinner />}
+            {t('guardrail.tryRun')}
+          </Button>
+        </div>
+        <p className="hint" aria-live="polite">
+          {tried?.status === 'done' && tried.result.ok
+            ? t('guardrail.decision', { decision: t(`guardrail.decision.${tried.result.decision}`), ms: fmt.number(tried.result.latencyMs) })
+            : tried?.status === 'done' && !tried.result.ok
+              ? t(`chatbot.conn.err.${tried.result.error.kind}`)
+              : t('guardrail.noConfidence')}
+        </p>
+      </form>
+      {dirty && <p className="hint">{t('chatbot.conn.savedOnly')}</p>}
+    </Card>
+  )
+}
+
 function Headers({ form, errors, onChange }: { form: ProviderForm; errors: Errors; onChange: (headers: ProviderForm['headers']) => void }) {
   const { t } = useI18n()
   const set = (i: number, patch: Partial<ProviderForm['headers'][number]>) => onChange(form.headers.map((h, j) => (j === i ? { ...h, ...patch } : h)))
@@ -601,7 +761,7 @@ function Headers({ form, errors, onChange }: { form: ProviderForm; errors: Error
   )
 }
 
-function ConnStatus({ conn }: { conn?: Conn }) {
+function ConnStatus({ conn }: { conn?: Conn | Decided }) {
   const { t, fmt } = useI18n()
   if (!conn) return null
   if (conn.status === 'loading') return <span className="conn conn-loading">{t('chatbot.conn.testing')}</span>
