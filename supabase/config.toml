@@ -352,3 +352,7 @@ verify_jwt = false
 [functions.pages]
 # Same as test-connection: the function verifies the admin with auth.getUser().
 verify_jwt = false
+
+[functions.token-health]
+# Called only by pg_cron; the function checks the x-cron-secret header against Vault.
+verify_jwt = false

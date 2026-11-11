@@ -268,6 +268,12 @@ export const en = {
   'chatbot.save.failed': 'Could not save the settings',
   'chatbot.save.invalid': 'Fix the highlighted fields before saving',
   'chatbot.save.otherProvider': 'The {name} provider also has errors. Select it to fix them.',
+  'health.noPages': 'No Pages connected',
+  'health.healthy': 'Healthy · {n} Pages',
+  'health.invalid': 'Token invalid · {n} of {total} Pages',
+  'health.bannerTitle': 'Facebook no longer accepts the token of {n} Page(s).',
+  'health.bannerBody': 'The bot stopped replying there. Reconnect to bring it back.',
+  'health.reconnect': 'Reconnect',
 }
 
 export type MessageKey = keyof typeof en
