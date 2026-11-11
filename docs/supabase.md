@@ -6,6 +6,14 @@ The hosted project is the only environment. There is no CI: checks, seeding and 
 
 - Create with `supabase migration new <name>`. One migration file per PR.
 - Migrations are applied to the hosted project by `scripts/supabase-deploy.sh` after the PR merges.
+- Before merge, test a new migration against hosted with `scripts/sql-test.sh <migration.sql> supabase/tests/<name>_test.sql`. It runs all files in one transaction that is always rolled back. Test files raise on any failed `assert`.
+
+## AI provider keys
+
+- Keys are stored in Supabase Vault, one secret per provider named `ai_provider_key:<kind>`. `ai_providers` keeps only `key_hint` (vendor prefix plus last 4 characters), `key_saved_at` and the secret id.
+- The browser saves, replaces and removes keys only through `set_provider_key(kind, key)` and `remove_provider_key(kind)`, which check `is_admin()`. Admins cannot write the key columns directly.
+- Edge Functions read a key with the service role: `rpc("get_provider_key", { p_kind })`. No browser role can execute it.
+- `extra_headers` is readable by admins. Never put credentials there.
 
 ## Access rules
 
