@@ -15,7 +15,7 @@ export type SeedEntry = {
   match: Filter[];
 };
 
-export const SEED_MATCH: Filter[] = [
+export const WEBHOOK_EVENTS_MATCH: Filter[] = [
   { column: "page_id", op: "eq", value: SEED_PAGE_ID },
   { column: "external_id", op: "like", value: `${SEED_PREFIX}%` },
 ];
@@ -44,7 +44,7 @@ export const REGISTRY: SeedEntry[] = [
       webhookEvent(2, "Có việc làm cho sinh viên năm nhất không?"),
       webhookEvent(3, "Cảm ơn bạn"),
     ],
-    match: SEED_MATCH,
+    match: WEBHOOK_EVENTS_MATCH,
   },
 ];
 
