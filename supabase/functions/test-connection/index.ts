@@ -1,7 +1,7 @@
 // Chatbot tab "Test connection": POST {kind} with the admin's Supabase session token.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { chat } from "../_shared/ai/chat.ts";
-import { loadProvider } from "../_shared/ai/config.ts";
+import { loadGuardrail, loadProvider } from "../_shared/ai/config.ts";
 import { withCors } from "../_shared/cors.ts";
 import { handle } from "./handler.ts";
 
@@ -11,6 +11,7 @@ Deno.serve(withCors((req) =>
   handle(req, {
     getUser: async (token) => (await db.auth.getUser(token)).data.user,
     loadProvider: (kind) => loadProvider(db, kind),
+    loadGuardrail: () => loadGuardrail(db),
     chat,
   })
 ));

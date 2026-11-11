@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "jsr:@std/assert@1.0.6";
 import { AiError, chat, type ProviderConfig, redact } from "./chat.ts";
+import { decide } from "./quyet.ts";
 
 // Fake key, built at runtime so the secret scan does not flag a literal.
 const KEY = ["sk", "test", "0123456789abcdefghijklmnopqrstuvwxyz"].join("-");
@@ -200,5 +201,18 @@ Deno.test("a redirect is not followed, so the key never reaches the redirect tar
   await withFetch(() => new Response(null, { status: 307, headers: { location: "http://169.254.169.254/" } }), async (calls) => {
     const e = await assertRejects(() => chat(config("custom"), [{ role: "user", content: "hi" }], { maxTokens: 64 }), AiError);
     assertEquals([e.kind, calls.length], ["bad_config", 1]);
+  });
+});
+
+Deno.test("quyet (FPT): one token at temperature 0, api-key and bearer headers, letter read back", async () => {
+  await withFetch(() => completion("C"), async (calls) => {
+    const result = await decide(chat, config("quyet", { baseUrl: "https://mkp-api.fptcloud.com/v1" }), [], ["cho em gặp người thật"]);
+    assertEquals(result.decision, "human_request");
+    assertEquals(calls[0].url, "https://mkp-api.fptcloud.com/v1/chat/completions");
+    assertEquals(calls[0].headers.get("api-key"), KEY);
+    assertEquals(calls[0].headers.get("authorization"), `Bearer ${KEY}`);
+    assertEquals(calls[0].body.max_tokens, 1);
+    assertEquals(calls[0].body.temperature, 0);
+    assertEquals(calls.length, 1);
   });
 });

@@ -1,6 +1,7 @@
 // Bot reply engine: debounce, claim the conversation, gate, build the prompt, call the AI provider, send.
 // Free of env and network so it can be unit-tested; db.ts wires it to Supabase.
 import { AiError, type ChatMessage, type ChatParams, type ChatResult, type ProviderConfig, type ProviderKind } from "../ai/chat.ts";
+import type { Decided, StateMessage } from "../ai/quyet.ts";
 import { MAX_TEXT, type Sender, type SendResult } from "../messenger/send.ts";
 
 // Floor for the reply delay, so messages sent close together always get one reply.
@@ -35,11 +36,21 @@ export type Settings = {
   max_tokens: number;
   rate_limit_per_hour: number;
   handoff_message: string;
-  guardrails: { handoff_on_keyword?: boolean; handoff_on_low_confidence?: boolean; handoff_on_complaint?: boolean };
+  guardrails: {
+    handoff_on_keyword?: boolean;
+    handoff_on_low_confidence?: boolean;
+    handoff_on_complaint?: boolean;
+    // Model guardrail (Quyet): off unless model_enabled; each check maps one decision to an action.
+    model_enabled?: boolean;
+    handoff_on_human_request?: boolean;
+    refuse_off_topic?: boolean;
+    on_model_error?: "reply" | "handoff";
+    off_topic_message?: string;
+  };
 };
 
 // Stored in conversations.handoff_reason and the system event; the Inbox translates it.
-export type HandoffReason = "keyword" | "send_failed" | "bot_error" | "low_confidence" | "complaint";
+export type HandoffReason = "keyword" | "send_failed" | "bot_error" | "low_confidence" | "complaint" | "human_request";
 
 export type HistoryMessage = { sender_kind: "user" | "bot" | "admin" | "system"; text: string | null };
 
@@ -66,8 +77,8 @@ export type Deps = {
   sendText(pageId: string, psid: string, text: string, sender: Sender): Promise<SendResult>;
   handOff(conversationId: string, reason: HandoffReason, detail?: Record<string, unknown>): Promise<void>;
   searchJobs?: SearchJobs;
-  // shortcut: no low-confidence or complaint classifier exists yet; wire one here when it does.
-  detectHandoff?: (turn: Turn) => Promise<"low_confidence" | "complaint" | null>;
+  // Model guardrail decision for the turn; throws (AiError on timeout) when the model fails.
+  guardrail?: (turn: Turn) => Promise<Decided>;
 };
 
 export type HoursDecision = "always" | "open" | "closed" | "invalid";
@@ -121,17 +132,52 @@ export function keywordHandoff(guardrails: Settings["guardrails"], texts: string
   return guardrails.handoff_on_keyword ? matchKeyword(texts, keywords) : null;
 }
 
-// Runs before the hours and rate-limit checks: a request for a person is always flagged.
-async function detectHandoff(deps: Deps, page: Page, turn: Turn): Promise<{ reason: HandoffReason; detail?: Record<string, unknown> } | null> {
-  if (!page.bot_enabled || turn.conversation.status !== "bot") return null;
-  const { guardrails } = turn.settings;
-  const keyword = keywordHandoff(guardrails, turn.newCustomerTexts, page.handoff_keywords ?? []);
-  if (keyword) return { reason: "keyword", detail: { keyword } };
-  if (deps.detectHandoff && (guardrails.handoff_on_low_confidence || guardrails.handoff_on_complaint)) {
-    const reason = await deps.detectHandoff(turn);
-    if (reason && guardrails[`handoff_on_${reason}`]) return { reason };
+// Guardrail state: earlier messages, then the customer texts this turn answers. Staff replies count as the bot's side.
+export function guardrailState(turn: Turn): { earlier: StateMessage[]; latest: string[] } {
+  const rows = turn.history.filter((m) => m.text && m.sender_kind !== "system");
+  let cut = rows.length;
+  for (let n = turn.newCustomerTexts.length; cut > 0 && n > 0; cut--) {
+    if (rows[cut - 1].sender_kind === "user") n--;
   }
-  return null;
+  const earlier = rows.slice(0, cut).map((m): StateMessage => ({ from: m.sender_kind === "user" ? "customer" : "bot", text: m.text! }));
+  return { earlier, latest: turn.newCustomerTexts };
+}
+
+type Checked = {
+  handoff?: { reason: HandoffReason; detail?: Record<string, unknown> };
+  // Send the off-topic message instead of calling the reply model.
+  refuse?: boolean;
+  guardrail?: Record<string, unknown>;
+};
+
+// Runs before the hours and rate-limit checks: a request for a person is always flagged.
+// Keyword first, then one model guardrail call; a decision whose check is off passes.
+async function check(deps: Deps, page: Page, turn: Turn, conversationId: string): Promise<Checked> {
+  if (!page.bot_enabled || turn.conversation.status !== "bot") return {};
+  const g = turn.settings.guardrails;
+  const keyword = keywordHandoff(g, turn.newCustomerTexts, page.handoff_keywords ?? []);
+  if (keyword) return { handoff: { reason: "keyword", detail: { keyword } } };
+  if (!deps.guardrail || !g.model_enabled || !(g.handoff_on_complaint || g.handoff_on_human_request || g.refuse_off_topic)) {
+    return {};
+  }
+
+  try {
+    const { decision, model, latencyMs } = await deps.guardrail(turn);
+    // Never log customer text: decision and latency only.
+    console.log(JSON.stringify({ event: "guardrail", conversationId, decision, latencyMs }));
+    const guardrail = { model, decision, latencyMs };
+    if (decision === "complaint" && g.handoff_on_complaint) return { guardrail, handoff: { reason: "complaint" } };
+    if (decision === "human_request" && g.handoff_on_human_request) return { guardrail, handoff: { reason: "human_request" } };
+    if (decision === "off_topic_or_abuse" && g.refuse_off_topic) return { guardrail, refuse: true };
+    return { guardrail };
+  } catch (e) {
+    const error = e instanceof AiError ? e.kind : "internal";
+    console.error(JSON.stringify({ event: "guardrail", conversationId, error }));
+    const guardrail = { decision: "error", error };
+    // Fail-open by default: the bot replies as if there were no model guardrail.
+    if (g.on_model_error === "handoff") return { guardrail, handoff: { reason: "bot_error", detail: { guardrail_error: error } } };
+    return { guardrail };
+  }
 }
 
 export type Gate = {
@@ -204,12 +250,13 @@ function log(fields: Record<string, unknown>) {
 
 async function reply(deps: Deps, page: Page, psid: string, conversationId: string, upTo: string) {
   const turn = await deps.loadTurn(conversationId);
-  const handoff = await detectHandoff(deps, page, turn);
+  const { handoff, refuse, guardrail } = await check(deps, page, turn, conversationId);
   if (handoff) {
     log({ pageId: page.id, conversationId, replyUpTo: upTo, handoff: handoff.reason });
     // Status first, so nothing else answers; a failed notice still leaves it with a person.
     await deps.handOff(conversationId, handoff.reason, handoff.detail);
-    const sent = await deps.sendText(page.id, psid, turn.settings.handoff_message, { kind: "bot", trace: { handoff: handoff.reason, replyUpTo: upTo } });
+    const trace = { handoff: handoff.reason, replyUpTo: upTo, ...(guardrail && { guardrail }) };
+    const sent = await deps.sendText(page.id, psid, turn.settings.handoff_message, { kind: "bot", trace });
     if (!sent.ok) console.error("bot: handoff message not sent", sent.error.kind);
     return;
   }
@@ -219,19 +266,25 @@ async function reply(deps: Deps, page: Page, psid: string, conversationId: strin
 
   const { settings } = turn;
   const trace: Record<string, unknown> = { provider: settings.active_provider, gate: decisions, replyUpTo: upTo };
+  if (guardrail) trace.guardrail = guardrail;
   let text: string;
   let failure: string | null = null;
-  try {
-    const config = await deps.loadProvider(settings.active_provider);
-    trace.model = config.model;
-    const { text: reply, ...rest } = await generate(deps.chat, config, settings, page.name, turn.history);
-    Object.assign(trace, rest);
-    text = reply;
-  } catch (e) {
-    failure = e instanceof AiError ? e.kind : "internal";
-    console.error("bot: provider failed", failure, e instanceof Error ? e.message : "");
-    trace.fallback = failure;
-    text = settings.fallback;
+  if (refuse) {
+    trace.refused = "off_topic_or_abuse";
+    text = settings.guardrails.off_topic_message?.trim() || settings.fallback;
+  } else {
+    try {
+      const config = await deps.loadProvider(settings.active_provider);
+      trace.model = config.model;
+      const { text: reply, ...rest } = await generate(deps.chat, config, settings, page.name, turn.history);
+      Object.assign(trace, rest);
+      text = reply;
+    } catch (e) {
+      failure = e instanceof AiError ? e.kind : "internal";
+      console.error("bot: provider failed", failure, e instanceof Error ? e.message : "");
+      trace.fallback = failure;
+      text = settings.fallback;
+    }
   }
 
   const sent = await deps.sendText(page.id, psid, text, { kind: "bot", trace });

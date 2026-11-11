@@ -7,7 +7,8 @@ export const PROVIDER_KINDS = ["hermes", "openai", "anthropic", "custom"] as con
 export type ProviderKind = typeof PROVIDER_KINDS[number];
 
 export type ProviderConfig = {
-  kind: ProviderKind;
+  // "quyet" is the guardrail model (its own table), never a reply provider.
+  kind: ProviderKind | "quyet";
   baseUrl: string;
   model: string;
   apiKey: string;
