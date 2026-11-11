@@ -442,8 +442,8 @@ export type Database = {
         Args: { p_conversation_id: string; p_up_to: string }
         Returns: boolean
       }
-      get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_guardrail_key: { Args: never; Returns: string }
+      get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: string
@@ -497,16 +497,16 @@ export type Database = {
         Args: { p_admin_id: string; p_conversation_id: string; p_mode: string }
         Returns: boolean
       }
-      set_page_token: {
-        Args: { p_expires_at: string; p_page_id: string; p_token: string }
-        Returns: undefined
-      }
       set_guardrail_key: {
         Args: { p_key: string }
         Returns: {
           key_hint: string
           key_saved_at: string
         }[]
+      }
+      set_page_token: {
+        Args: { p_expires_at: string; p_page_id: string; p_token: string }
+        Returns: undefined
       }
       set_provider_key: {
         Args: {
