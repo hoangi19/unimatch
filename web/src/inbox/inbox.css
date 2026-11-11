@@ -5,6 +5,18 @@
   .app.inbox-mode .view { flex: 1; min-height: 0; max-width: none; padding: 14px 20px 16px; display: flex; flex-direction: column; }
 
   .inbox { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  /* Stats strip: wraps on narrow screens instead of scrolling sideways. */
+  .ib-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; flex: none; }
+  .ib-stat {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 12px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); font-size: var(--text-sm); white-space: nowrap;
+  }
+  .ib-stat .ic { color: var(--primary-text); width: 14px; height: 14px; }
+  .ib-stat .k { color: var(--muted-fg); }
+  .ib-stat .v { margin: 0; font-family: var(--font-head); font-weight: 600; font-size: var(--text-md); font-variant-numeric: tabular-nums; }
+  .ib-stat.warn { background: var(--warning-soft); border-color: transparent; }
+  .ib-stat.warn .ic { color: var(--warning); }
   .ib-grid {
     flex: 1; min-height: 0; display: grid; grid-template-columns: 330px minmax(0, 1fr);
     border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; box-shadow: var(--shadow-sm);

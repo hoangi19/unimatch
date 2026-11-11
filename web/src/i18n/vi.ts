@@ -421,4 +421,12 @@ export const vi: Record<MessageKey, string> = {
   'inbox.compose.error.rate_limit': 'Chưa gửi: Messenger đang giới hạn tốc độ. Hãy thử lại sau.',
   'inbox.compose.error.user_unavailable': 'Chưa gửi: người này hiện không nhận được tin trên Messenger.',
   'inbox.compose.error.send_failed': 'Chưa gửi: Messenger không nhận tin nhắn.',
+  'inboxStats.label': 'Hôm nay',
+  'inboxStats.open': 'Hội thoại đang mở',
+  'inboxStats.botPct': 'Bot tự xử lý',
+  'inboxStats.firstResponse': 'Phản hồi đầu TB',
+  'inboxStats.waiting': 'Chờ nhân viên',
+  'inboxStats.seconds': '{n} giây',
+  'inboxStats.minutes': '{n} phút',
+  'inboxStats.hours': '{n} giờ',
 }

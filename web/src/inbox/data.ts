@@ -40,6 +40,15 @@ export function toSendResult(body: unknown): SendResult {
   return { ok: false, messageId: null, error: { kind: 'send_failed', message: 'Unexpected response' } }
 }
 
+/** inbox_stats for today in Asia/Ho_Chi_Minh; the migration defines each number. */
+export type InboxStats = {
+  open_conversations: number
+  waiting_for_human: number
+  customer_conversations: number
+  bot_handled: number
+  avg_first_response_seconds: number | null
+}
+
 export type InboxData = {
   /** Each method throws on a database error. */
   loadPages(): Promise<InboxPage[]>
@@ -58,6 +67,8 @@ export type InboxData = {
   /** Never throws: a transport error is a `send_failed` result. `retryOf` is the failed row this attempt replaces. */
   send(conversationId: string, text: string, retryOf?: string): Promise<SendResult>
   loadQuickReplies(): Promise<string[]>
+  /** Today's stats, for one Page when `pageId` is given. */
+  loadStats(pageId?: string): Promise<InboxStats>
 }
 
 /** `resync`: the connection came back and rows may have been missed, so refetch. */

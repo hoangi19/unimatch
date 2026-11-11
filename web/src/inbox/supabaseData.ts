@@ -87,6 +87,11 @@ export const supabaseInboxData: InboxData = {
     check(error)
     return data?.quick_replies ?? []
   },
+  async loadStats(pageId) {
+    const { data, error } = await supabase.rpc('inbox_stats', pageId ? { p_page_id: pageId } : {}).single()
+    check(error)
+    return data!
+  },
 }
 
 async function errorBody(error: unknown): Promise<unknown> {

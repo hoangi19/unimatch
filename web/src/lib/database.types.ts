@@ -335,6 +335,16 @@ export type Database = {
         Args: { p_conversation_id: string; p_detail: Json; p_reason: string }
         Returns: boolean
       }
+      inbox_stats: {
+        Args: { p_from?: string; p_page_id?: string; p_to?: string }
+        Returns: {
+          avg_first_response_seconds: number
+          bot_handled: number
+          customer_conversations: number
+          open_conversations: number
+          waiting_for_human: number
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
       process_webhook_event: {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }

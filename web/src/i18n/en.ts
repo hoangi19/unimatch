@@ -419,6 +419,14 @@ export const en = {
   'inbox.compose.error.rate_limit': 'Not sent: Messenger rate limit reached. Try again later.',
   'inbox.compose.error.user_unavailable': 'Not sent: this person is not available on Messenger.',
   'inbox.compose.error.send_failed': 'Not sent: Messenger did not accept the message.',
+  'inboxStats.label': 'Today',
+  'inboxStats.open': 'Open conversations',
+  'inboxStats.botPct': 'Handled by bot',
+  'inboxStats.firstResponse': 'Avg first response',
+  'inboxStats.waiting': 'Waiting for a person',
+  'inboxStats.seconds': '{n} s',
+  'inboxStats.minutes': '{n} min',
+  'inboxStats.hours': '{n} h',
 }
 
 export type MessageKey = keyof typeof en
