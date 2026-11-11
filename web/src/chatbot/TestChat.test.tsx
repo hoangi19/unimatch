@@ -55,7 +55,7 @@ it('sends the unsaved draft, the page and the history, never a key', async () =>
   const draft = toDraft(SAVED)
   draft.settings.system_prompt = 'Unsaved prompt'
   draft.providers.hermes.model = 'hermes-4-405b'
-  draft.providers.hermes.key = 'sk-typed-but-unsaved-key'
+  draft.providers.hermes.key = 'typed-but-unsaved-placeholder'
   draft.providers.hermes.headers = [{ name: ' X-Title ', value: 'UniMatch' }]
   const { api, box } = setup(REPLY, draft)
   await screen.findByText('Test chat · UniMatch')
@@ -75,7 +75,7 @@ it('sends the unsaved draft, the page and the history, never a key', async () =>
     { role: 'bot', text: 'Có ạ, mình gợi ý vài việc.' },
     { role: 'user', text: 'việc ở HCM?' },
   ])
-  expect(JSON.stringify(sent(api))).not.toContain('sk-typed')
+  expect(JSON.stringify(sent(api))).not.toContain('typed-but-unsaved')
 })
 
 it('shows provider errors with the fallback note', async () => {
