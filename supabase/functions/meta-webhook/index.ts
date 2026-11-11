@@ -19,8 +19,21 @@ async function validSignature(body: string, header: string | null): Promise<bool
   return diff === 0;
 }
 
+type MessagingItem = {
+  sender?: { id?: string };
+  timestamp?: number;
+  message?: { mid?: string };
+  postback?: { mid?: string };
+  [field: string]: unknown;
+};
+
+type WebhookPayload = {
+  object?: string;
+  entry?: { id: string | number; messaging?: MessagingItem[] }[];
+};
+
 // One row per messaging item; external_id dedupes Meta's retries.
-function toRows(payload: any) {
+function toRows(payload: WebhookPayload) {
   const rows = [];
   for (const entry of payload.entry ?? []) {
     for (const m of entry.messaging ?? []) {
@@ -46,7 +59,7 @@ Deno.serve(async (req) => {
     return new Response("Invalid signature", { status: 401 });
   }
 
-  let payload: any;
+  let payload: WebhookPayload;
   try {
     payload = JSON.parse(body);
   } catch {
