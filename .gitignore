@@ -2,3 +2,6 @@
 .env.*
 supabase/.temp/
 supabase/.branches/
+.worktrees/
+node_modules/
+dist/
