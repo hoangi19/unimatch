@@ -284,6 +284,7 @@ export type Database = {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
         Returns: string
       }
+      clear_page_token: { Args: { p_page_id: string }; Returns: undefined }
       get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
@@ -292,6 +293,18 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       process_webhook_event: {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
+        Returns: string
+      }
+      record_outbound_message: {
+        Args: {
+          p_admin_id: string
+          p_conversation_id: string
+          p_delivery_error: string
+          p_external_id: string
+          p_sender_kind: string
+          p_text: string
+          p_trace: Json
+        }
         Returns: string
       }
       remove_provider_key: {
