@@ -44,3 +44,16 @@ Deno.test("cleanOrder reverses the registry without mutating it", () => {
   assertEquals(reversed, [...REGISTRY].reverse());
   assertEquals(REGISTRY, original);
 });
+
+Deno.test("parents are seeded before children and cleaned after them", () => {
+  const order = REGISTRY.map((e) => e.table);
+  assert(order.indexOf("pages") < order.indexOf("conversations"));
+  assert(order.indexOf("conversations") < order.indexOf("messages"));
+});
+
+Deno.test("seed messages only point at seed conversations", () => {
+  const ids = new Set(REGISTRY.find((e) => e.table === "conversations")!.rows.map((r) => r.id));
+  for (const row of REGISTRY.find((e) => e.table === "messages")!.rows) {
+    assert(ids.has(row.conversation_id), `message ${row.external_id} has no seed conversation`);
+  }
+});
