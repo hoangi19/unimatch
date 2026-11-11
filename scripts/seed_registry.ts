@@ -66,3 +66,8 @@ export function rowMatches(row: Record<string, unknown>, filters: Filter[]): boo
     return f.op === "eq" ? cell === f.value : likeToRegExp(f.value).test(cell);
   });
 }
+
+// --clean refuses any entry whose filters do not pin rows to the seed prefix.
+export function hasSeedPrefixFilter(filters: Filter[]): boolean {
+  return filters.some((f) => f.op === "like" && f.value.startsWith(SEED_PREFIX));
+}

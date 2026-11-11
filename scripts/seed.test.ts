@@ -1,5 +1,15 @@
 import { assertEquals, assert } from "jsr:@std/assert@1.0.6";
-import { cleanOrder, REGISTRY, rowMatches, SEED_MATCH } from "./seed_registry.ts";
+import { cleanOrder, hasSeedPrefixFilter, REGISTRY, rowMatches, SEED_MATCH } from "./seed_registry.ts";
+
+Deno.test("every registry entry has a seed-prefix like filter so --clean only deletes seed rows", () => {
+  for (const entry of REGISTRY) {
+    assert(hasSeedPrefixFilter(entry.match), `${entry.table} has no seed-prefix like filter`);
+  }
+});
+
+Deno.test("an eq filter alone is not a seed-prefix filter", () => {
+  assertEquals(hasSeedPrefixFilter([{ column: "page_id", op: "eq", value: "seed-demo" }]), false);
+});
 
 Deno.test("every seed row matches its entry filters so --clean removes it", () => {
   for (const entry of REGISTRY) {

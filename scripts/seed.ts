@@ -1,7 +1,7 @@
 // Seeds demo rows into the hosted project, or removes them with --clean.
 // Usage: deno run --env-file=.env -A scripts/seed.ts [--clean]
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { cleanOrder, type Filter, REGISTRY, type SeedEntry } from "./seed_registry.ts";
+import { cleanOrder, type Filter, hasSeedPrefixFilter, REGISTRY, type SeedEntry } from "./seed_registry.ts";
 
 type Filterable<T> = { eq(column: string, value: string): T; like(column: string, value: string): T };
 
@@ -34,7 +34,11 @@ if (import.meta.main) {
   const client = makeClient();
 
   if (Deno.args.includes("--clean")) {
-    for (const entry of cleanOrder(REGISTRY)) {
+    const entries = cleanOrder(REGISTRY);
+    for (const entry of entries) {
+      if (!hasSeedPrefixFilter(entry.match)) fail(entry.table, "refusing --clean: no seed-prefix like filter");
+    }
+    for (const entry of entries) {
       const { error } = await applyFilters(client.from(entry.table).delete(), entry.match);
       if (error) fail(entry.table, error.message);
     }
