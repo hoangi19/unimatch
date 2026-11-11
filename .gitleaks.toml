@@ -2,4 +2,4 @@
 useDefault = true
 
 [allowlist]
-paths = ["^\\.env$", "^\\.worktrees/", "node_modules/"]
+paths = ["^\\.env$", "^\\.worktrees/", "node_modules/", "^web/dist/"]
