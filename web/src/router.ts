@@ -36,3 +36,12 @@ export function useTab() {
 
   return { tab, navigate }
 }
+
+export const LEGAL_PAGES = ['privacy', 'data-deletion'] as const
+export type LegalPage = (typeof LEGAL_PAGES)[number]
+
+/** Public pages that skip the login guard (Meta App Review links to them). */
+export function legalFromPath(path: string): LegalPage | null {
+  const segment = path.replace(/^\/+|\/+$/g, '')
+  return (LEGAL_PAGES as readonly string[]).includes(segment) ? (segment as LegalPage) : null
+}

@@ -2,8 +2,10 @@ import { authState, useSession, type AuthClient } from './auth'
 import type { ChatbotApi } from './chatbot/api'
 import { I18nProvider } from './i18n'
 import type { InboxData } from './inbox/data'
+import { LegalPage } from './Legal'
 import { Login, NoAccess } from './Login'
 import type { PagesData } from './pages/data'
+import { legalFromPath } from './router'
 import { Shell, type SystemStatus } from './Shell'
 import { ToastProvider } from './ui/ToastProvider'
 
@@ -11,11 +13,10 @@ type AppProps = { auth: AuthClient; status?: SystemStatus; inboxData?: InboxData
 
 // Status values arrive with later screens.
 export default function App(props: AppProps) {
+  const legal = legalFromPath(location.pathname)
   return (
     <I18nProvider>
-      <ToastProvider>
-        <Gate {...props} />
-      </ToastProvider>
+      <ToastProvider>{legal ? <LegalPage page={legal} /> : <Gate {...props} />}</ToastProvider>
     </I18nProvider>
   )
 }
