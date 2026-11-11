@@ -24,12 +24,15 @@ export type Job = {
 };
 export type SearchJobs = (query: string, count: number) => Promise<{ model: string; jobs: Job[] }>;
 export const JOB_COUNT = 5;
-// Cosine similarity floor; below it a job is not a match. Tuned in live tests.
-export const MIN_SIMILARITY = 0.45;
+// Cosine similarity floor; below it a job is not a match. Live tests on 98 jobs: unrelated queries top out
+// near 0.25, loose but relevant matches start near 0.38.
+export const MIN_SIMILARITY = 0.35;
 export const SEARCH_TIMEOUT_MS = 5_000;
 const QUERY_CHARS = 1_000;
-// Earlier customer messages added to the query, so a follow-up ("còn ở HCM thì sao?") keeps its topic.
+// Earlier customer messages added to a short follow-up ("còn ở HCM thì sao?") so it keeps its topic.
 const QUERY_EARLIER = 2;
+// shortcut: length decides follow-up vs new topic; switch to a query rewrite if short new topics get missed.
+const FOLLOW_UP_CHARS = 40;
 
 // The per-page reply settings are optional so the engine also runs before those columns exist.
 export type Page = {
@@ -222,8 +225,11 @@ const LANGUAGE_LINE = {
   auto: "Reply in the language of the customer's latest message.",
 };
 
-// The search query: this turn's customer texts plus a few earlier ones, newest kept when it runs long.
+// The search query: this turn's customer texts; a short follow-up also gets a few earlier ones, so a
+// new topic is not diluted by old ones. The newest text is kept when it runs long.
 export function jobQuery(history: HistoryMessage[], newCustomerTexts: string[]): string {
+  const current = newCustomerTexts.join("\n").trim();
+  if (current.length >= FOLLOW_UP_CHARS) return current.slice(-QUERY_CHARS).trim();
   const texts = history.filter((m) => m.sender_kind === "user" && m.text).map((m) => m.text!);
   const recent = texts.slice(-(newCustomerTexts.length + QUERY_EARLIER));
   return (recent.length ? recent : newCustomerTexts).join("\n").slice(-QUERY_CHARS).trim();
