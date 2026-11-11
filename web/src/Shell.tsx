@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ChatbotApi } from './chatbot/api'
+import { Chatbot } from './chatbot/Chatbot'
 import { LANGS, useI18n, type MessageKey } from './i18n'
 import type { PagesData } from './pages/data'
 import { PagesTab } from './pages/PagesTab'
@@ -14,9 +16,9 @@ const TAB_ICONS: Record<Tab, IconName> = { inbox: 'inbox', pages: 'facebook', da
 const DISABLED: ReadonlySet<Tab> = new Set(['dataset'])
 
 /** Tabs render their placeholder until their data source is passed in. */
-type ShellProps = { status?: SystemStatus; onSignOut?: () => void; pagesData?: PagesData }
+type ShellProps = { status?: SystemStatus; onSignOut?: () => void; pagesData?: PagesData; chatbot?: ChatbotApi }
 
-export function Shell({ status = {}, onSignOut, pagesData }: ShellProps) {
+export function Shell({ status = {}, onSignOut, pagesData, chatbot }: ShellProps) {
   const { t } = useI18n()
   const { tab, navigate } = useTab()
   const [navOpen, setNavOpen] = useState(false)
@@ -67,7 +69,13 @@ export function Shell({ status = {}, onSignOut, pagesData }: ShellProps) {
         <Topbar tab={tab} title={title} onOpenNav={() => setNavOpen(true)} navOpen={navOpen} onSignOut={onSignOut} />
         <StatusBar status={status} />
         <main className="view">
-          {tab === 'pages' && pagesData ? <PagesTab data={pagesData} /> : <TabPlaceholder tab={tab} />}
+          {tab === 'pages' && pagesData ? (
+            <PagesTab data={pagesData} />
+          ) : tab === 'chatbot' && chatbot ? (
+            <Chatbot api={chatbot} />
+          ) : (
+            <TabPlaceholder tab={tab} />
+          )}
         </main>
       </div>
     </div>
