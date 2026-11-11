@@ -14,6 +14,234 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_providers: {
+        Row: {
+          base_url: string | null
+          display_name: string | null
+          extra_headers: Json
+          key_hint: string | null
+          key_saved_at: string | null
+          key_secret_id: string | null
+          kind: Database["public"]["Enums"]["ai_provider_kind"]
+          model: string | null
+          supports_tools: boolean
+        }
+        Insert: {
+          base_url?: string | null
+          display_name?: string | null
+          extra_headers?: Json
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          kind: Database["public"]["Enums"]["ai_provider_kind"]
+          model?: string | null
+          supports_tools?: boolean
+        }
+        Update: {
+          base_url?: string | null
+          display_name?: string | null
+          extra_headers?: Json
+          key_hint?: string | null
+          key_saved_at?: string | null
+          key_secret_id?: string | null
+          kind?: Database["public"]["Enums"]["ai_provider_kind"]
+          model?: string | null
+          supports_tools?: boolean
+        }
+        Relationships: []
+      }
+      bot_settings: {
+        Row: {
+          active_provider: Database["public"]["Enums"]["ai_provider_kind"]
+          fallback: string
+          greeting: string
+          guardrails: Json
+          handoff_message: string
+          id: boolean
+          language: string
+          max_tokens: number
+          rate_limit_per_hour: number
+          system_prompt: string
+          temperature: number
+        }
+        Insert: {
+          active_provider?: Database["public"]["Enums"]["ai_provider_kind"]
+          fallback: string
+          greeting: string
+          guardrails: Json
+          handoff_message: string
+          id?: boolean
+          language?: string
+          max_tokens?: number
+          rate_limit_per_hour?: number
+          system_prompt: string
+          temperature?: number
+        }
+        Update: {
+          active_provider?: Database["public"]["Enums"]["ai_provider_kind"]
+          fallback?: string
+          greeting?: string
+          guardrails?: Json
+          handoff_message?: string
+          id?: boolean
+          language?: string
+          max_tokens?: number
+          rate_limit_per_hour?: number
+          system_prompt?: string
+          temperature?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_settings_active_provider_fkey"
+            columns: ["active_provider"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["kind"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_picture_url: string | null
+          handoff_at: string | null
+          handoff_reason: string | null
+          id: string
+          language: string | null
+          last_customer_message_at: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          notes: string
+          page_id: string
+          psid: string
+          status: string
+          unread_count: number
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_picture_url?: string | null
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          language?: string | null
+          last_customer_message_at?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          notes?: string
+          page_id: string
+          psid: string
+          status?: string
+          unread_count?: number
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_picture_url?: string | null
+          handoff_at?: string | null
+          handoff_reason?: string | null
+          id?: string
+          language?: string | null
+          last_customer_message_at?: string | null
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          notes?: string
+          page_id?: string
+          psid?: string
+          status?: string
+          unread_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          admin_id: string | null
+          attachments: Json | null
+          conversation_id: string
+          created_at: string
+          delivery_error: string | null
+          delivery_status: string
+          external_id: string | null
+          id: string
+          sender_kind: string
+          text: string | null
+          trace: Json | null
+        }
+        Insert: {
+          admin_id?: string | null
+          attachments?: Json | null
+          conversation_id: string
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string
+          external_id?: string | null
+          id?: string
+          sender_kind: string
+          text?: string | null
+          trace?: Json | null
+        }
+        Update: {
+          admin_id?: string | null
+          attachments?: Json | null
+          conversation_id?: string
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string
+          external_id?: string | null
+          id?: string
+          sender_kind?: string
+          text?: string | null
+          trace?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pages: {
+        Row: {
+          access_token_secret_id: string | null
+          bot_enabled: boolean
+          connected_at: string
+          id: string
+          name: string
+          picture_url: string | null
+          token_expires_at: string | null
+        }
+        Insert: {
+          access_token_secret_id?: string | null
+          bot_enabled?: boolean
+          connected_at?: string
+          id: string
+          name: string
+          picture_url?: string | null
+          token_expires_at?: string | null
+        }
+        Update: {
+          access_token_secret_id?: string | null
+          bot_enabled?: boolean
+          connected_at?: string
+          id?: string
+          name?: string
+          picture_url?: string | null
+          token_expires_at?: string | null
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           external_id: string | null
@@ -49,10 +277,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_page_token: { Args: { p_page_id: string }; Returns: string }
+      get_provider_key: {
+        Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
+        Returns: string
+      }
+      is_admin: { Args: never; Returns: boolean }
+      remove_provider_key: {
+        Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
+        Returns: undefined
+      }
+      set_page_token: {
+        Args: { p_expires_at: string; p_page_id: string; p_token: string }
+        Returns: undefined
+      }
+      set_provider_key: {
+        Args: {
+          p_key: string
+          p_kind: Database["public"]["Enums"]["ai_provider_kind"]
+        }
+        Returns: {
+          key_hint: string
+          key_saved_at: string
+        }[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      ai_provider_kind: "hermes" | "openai" | "anthropic" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -179,6 +430,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      ai_provider_kind: ["hermes", "openai", "anthropic", "custom"],
+    },
   },
 } as const

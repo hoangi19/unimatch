@@ -46,7 +46,7 @@ if (import.meta.main) {
     for (const entry of REGISTRY) {
       const { error } = await client
         .from(entry.table)
-        .upsert(entry.rows, { onConflict: entry.conflict, ignoreDuplicates: true });
+        .upsert(entry.rows, { onConflict: entry.conflict, ignoreDuplicates: true, defaultToNull: false });
       if (error) fail(entry.table, error.message);
     }
   }
