@@ -244,6 +244,7 @@ export type Database = {
       }
       webhook_events: {
         Row: {
+          error: string | null
           external_id: string | null
           field: string
           id: number
@@ -253,6 +254,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          error?: string | null
           external_id?: string | null
           field: string
           id?: never
@@ -262,6 +264,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          error?: string | null
           external_id?: string | null
           field?: string
           id?: never
@@ -277,16 +280,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_webhook_event: {
+        Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
+        Returns: string
+      }
       get_page_token: { Args: { p_page_id: string }; Returns: string }
       get_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: string
       }
       is_admin: { Args: never; Returns: boolean }
+      process_webhook_event: {
+        Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
+        Returns: string
+      }
       remove_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: undefined
       }
+      replay_webhook_events: { Args: { p_page_id: string }; Returns: number }
       set_page_token: {
         Args: { p_expires_at: string; p_page_id: string; p_token: string }
         Returns: undefined
