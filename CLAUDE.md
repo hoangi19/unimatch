@@ -10,9 +10,11 @@ Admin console for a Facebook Page chatbot that answers job questions. Board: htt
 - **AI:** provider is selectable (Hermes, OpenAI, Claude, custom OpenAI-compatible). Keys live in Supabase Vault, never in the browser.
 - **Out of scope for now:** the Dataset tab (LinkedIn crawl, embeddings, job search) and PostHog.
 
-## Environments
+## Environments and deploys
 
-One environment only: GitHub Environment `production` holds every secret and variable for CI. There is no separate dev project; test against the hosted project and clean up what tests create. Do not run a local Supabase stack.
+- One environment only. There is no separate dev project; test against the hosted project and clean up what tests create. Do not run a local Supabase stack.
+- **No CI runner and no GitHub Actions.** Checks (lint, typecheck, test, build) and deploys run on this machine through local scripts. The PM deploys after merging.
+- Deploy credentials are local: Cloudflare token in `~/.cloudflare-token`, Supabase access token in `~/.supabase-token`, everything else in the repo `.env` (git-ignored). GitHub Environment `production` keeps a copy for reuse only. Never print them.
 
 ## Live testing
 
