@@ -98,7 +98,7 @@ export const REGISTRY: SeedEntry[] = [
       conversation(SEED_CONV_BOT, 1, "Nguyễn Minh Anh", { status: "bot", unread_count: 1, last_message_preview: "Cảm ơn bạn" }),
       conversation(SEED_CONV_NEEDS, 2, "Trần Quốc Bảo", {
         status: "needs_human",
-        handoff_reason: "user typed handoff keyword",
+        handoff_reason: "keyword",
         handoff_at: "2026-01-01T00:01:00Z",
         unread_count: 2,
         last_message_preview: "gặp nhân viên",

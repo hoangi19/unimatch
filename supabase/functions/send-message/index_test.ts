@@ -4,8 +4,9 @@ import { type Deps, handle } from "./handler.ts";
 
 const CONV = "00000000-0000-4000-8000-000000000001";
 
-function deps(result: SendResult = { ok: true, messageId: "row-1", externalId: "m_1" }) {
+function deps(result: SendResult = { ok: true, messageId: "row-1", externalId: "m_1" }, takeOverFails = false) {
   const sends: [string, string, string, Sender][] = [];
+  const takeovers: [string, string][] = [];
   const d: Deps = {
     getUser: (token) =>
       Promise.resolve(
@@ -20,8 +21,12 @@ function deps(result: SendResult = { ok: true, messageId: "row-1", externalId: "
       sends.push([pageId, psid, text, sender]);
       return Promise.resolve(result);
     },
+    takeOver: (conversationId, adminId) => {
+      takeovers.push([conversationId, adminId]);
+      return takeOverFails ? Promise.reject(new Error("db down")) : Promise.resolve();
+    },
   };
-  return { d, sends };
+  return { d, sends, takeovers };
 }
 
 function post(token: string | null, body: unknown = { conversation_id: CONV, text: " hello " }) {
@@ -57,15 +62,29 @@ Deno.test("unknown conversation is 404", async () => {
 });
 
 Deno.test("admin sends trimmed text as themselves", async () => {
-  const { d, sends } = deps();
+  const { d, sends, takeovers } = deps();
   const res = await handle(post("admin-token"), d);
   assertEquals(await res.json(), { ok: true, message_id: "row-1" });
   assertEquals(sends, [["p1", "u1", "hello", { kind: "admin", adminId: "admin-1" }]]);
+  assertEquals(takeovers, [[CONV, "admin-1"]]);
+});
+
+Deno.test("a failed takeover does not fail a delivered send", async () => {
+  const { error } = console;
+  console.error = () => {};
+  try {
+    const res = await handle(post("admin-token"), deps(undefined, true).d);
+    assertEquals(await res.json(), { ok: true, message_id: "row-1" });
+  } finally {
+    console.error = error;
+  }
 });
 
 Deno.test("a typed send error comes back with the failed row id", async () => {
   const error = { kind: "outside_window" as const, message: "The customer's last message is older than 24 hours" };
-  const res = await handle(post("admin-token"), deps({ ok: false, error }).d);
+  const { d, takeovers } = deps({ ok: false, error });
+  const res = await handle(post("admin-token"), d);
   assertEquals(res.status, 200);
   assertEquals(await res.json(), { ok: false, message_id: null, error });
+  assertEquals(takeovers, []);
 });

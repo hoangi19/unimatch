@@ -31,31 +31,35 @@ export function botDeps(db: SupabaseClient): Deps {
     loadTurn: async (conversationId) => {
       const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const [conversation, settings, history, count] = await Promise.all([
-        db.from("conversations").select("status").eq("id", conversationId).single(),
+        db.from("conversations").select("status, bot_replied_up_to").eq("id", conversationId).single(),
         db.from("bot_settings")
-          .select("active_provider, system_prompt, fallback, language, temperature, max_tokens, rate_limit_per_hour")
+          .select("active_provider, system_prompt, fallback, language, temperature, max_tokens, rate_limit_per_hour, handoff_message, guardrails")
           .single(),
-        db.from("messages").select("sender_kind, text").eq("conversation_id", conversationId)
+        db.from("messages").select("sender_kind, text, created_at").eq("conversation_id", conversationId)
           .neq("delivery_status", "failed").order("created_at", { ascending: false }).limit(HISTORY_LIMIT),
         db.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId)
           .eq("sender_kind", "bot").gte("created_at", hourAgo),
       ]);
       const error = conversation.error ?? settings.error ?? history.error ?? count.error;
       if (error) throw new Error(`could not load the turn: ${error.message}`);
+      const rows = (history.data ?? []).reverse();
+      const repliedUpTo = Date.parse(conversation.data!.bot_replied_up_to ?? "") || -Infinity;
       return {
         conversation: conversation.data!,
         settings: settings.data!,
-        history: (history.data ?? []).reverse(),
+        history: rows,
+        newCustomerTexts: rows.filter((m) => m.sender_kind === "user" && m.text && Date.parse(m.created_at) > repliedUpTo)
+          .map((m) => m.text!),
         botMessagesLastHour: count.count ?? 0,
       };
     },
     loadProvider: (kind) => loadProvider(db, kind),
     chat: (config, messages, params) => chat(config, messages, params),
     sendText: (pageId, psid, text, sender) => sendText(messenger, pageId, psid, text, sender),
-    handOff: async (conversationId, reason) => {
-      const { error } = await db.from("conversations")
-        .update({ status: "needs_human", handoff_reason: reason, handoff_at: new Date().toISOString() })
-        .eq("id", conversationId);
+    handOff: async (conversationId, reason, detail) => {
+      const { error } = await db.rpc("hand_off_conversation", {
+        p_conversation_id: conversationId, p_reason: reason, p_detail: detail ?? null,
+      });
       if (error) console.error("bot: could not hand off", error.message);
     },
   };
