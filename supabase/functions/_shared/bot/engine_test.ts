@@ -466,7 +466,7 @@ Deno.test("findJobs: no search wired adds no section; a slow search times out", 
   assertEquals((found.retrieval as Record<string, unknown>).error, "timeout");
 });
 
-Deno.test("jobQuery: this turn plus two earlier customer messages, newest kept", () => {
+Deno.test("jobQuery: a short follow-up gets two earlier customer messages, newest kept", () => {
   const history = [
     { sender_kind: "user", text: "a" },
     { sender_kind: "user", text: "b" },
@@ -476,4 +476,14 @@ Deno.test("jobQuery: this turn plus two earlier customer messages, newest kept",
   ] as const;
   assertEquals(jobQuery([...history], ["d"]), "b\nc\nd");
   assertEquals(jobQuery([{ sender_kind: "user", text: "x".repeat(2_000) }], ["x"]).length, 1_000);
+});
+
+Deno.test("jobQuery: a long new message is searched alone, without earlier topics", () => {
+  const ask = "có việc part-time phục vụ quán cà phê không";
+  const history = [
+    { sender_kind: "user", text: "mình tìm việc bảo vệ ở Hà Nội" },
+    { sender_kind: "user", text: ask },
+  ] as const;
+  assertEquals(jobQuery([...history], [ask]), ask);
+  assertEquals(jobQuery([], ["y".repeat(2_000)]).length, 1_000);
 });
