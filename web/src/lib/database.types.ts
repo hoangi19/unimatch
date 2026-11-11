@@ -114,6 +114,7 @@ export type Database = {
           last_customer_message_at: string | null
           last_message_at: string | null
           last_message_preview: string | null
+          needs_help: boolean | null
           notes: string
           page_id: string
           psid: string
@@ -133,6 +134,7 @@ export type Database = {
           last_customer_message_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
+          needs_help?: boolean | null
           notes?: string
           page_id: string
           psid: string
@@ -152,6 +154,7 @@ export type Database = {
           last_customer_message_at?: string | null
           last_message_at?: string | null
           last_message_preview?: string | null
+          needs_help?: boolean | null
           notes?: string
           page_id?: string
           psid?: string
@@ -176,6 +179,7 @@ export type Database = {
           created_at: string
           delivery_error: string | null
           delivery_status: string
+          event: Json | null
           external_id: string | null
           id: string
           sender_kind: string
@@ -189,6 +193,7 @@ export type Database = {
           created_at?: string
           delivery_error?: string | null
           delivery_status?: string
+          event?: Json | null
           external_id?: string | null
           id?: string
           sender_kind: string
@@ -202,6 +207,7 @@ export type Database = {
           created_at?: string
           delivery_error?: string | null
           delivery_status?: string
+          event?: Json | null
           external_id?: string | null
           id?: string
           sender_kind?: string
@@ -319,6 +325,10 @@ export type Database = {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: string
       }
+      hand_off_conversation: {
+        Args: { p_conversation_id: string; p_detail: Json; p_reason: string }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       process_webhook_event: {
         Args: { e: Database["public"]["Tables"]["webhook_events"]["Row"] }
@@ -341,6 +351,14 @@ export type Database = {
         Returns: undefined
       }
       replay_webhook_events: { Args: { p_page_id: string }; Returns: number }
+      set_conversation_mode: {
+        Args: { p_conversation_id: string; p_mode: string }
+        Returns: boolean
+      }
+      set_conversation_mode_as: {
+        Args: { p_admin_id: string; p_conversation_id: string; p_mode: string }
+        Returns: boolean
+      }
       set_page_token: {
         Args: { p_expires_at: string; p_page_id: string; p_token: string }
         Returns: undefined
