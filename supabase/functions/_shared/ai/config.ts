@@ -1,6 +1,7 @@
 // Loads a provider's saved config and its Vault key. `db` must be the service-role client.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.45.4";
 import { AiError, type ProviderConfig, type ProviderKind } from "./chat.ts";
+import { assertPublicHost } from "./host.ts";
 
 export async function loadProvider(db: SupabaseClient, kind: ProviderKind): Promise<ProviderConfig> {
   const { data: row, error } = await db
@@ -11,6 +12,7 @@ export async function loadProvider(db: SupabaseClient, kind: ProviderKind): Prom
   if (error) throw new Error(`could not load provider ${kind}`);
   if (!row) throw new AiError("bad_config", `Unknown provider: ${kind}`);
   if (!row.base_url || !row.model) throw new AiError("bad_config", "Set a base URL and a model for this provider first");
+  await assertPublicHost(row.base_url);
 
   return {
     kind,

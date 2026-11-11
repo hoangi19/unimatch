@@ -253,7 +253,7 @@ export const en = {
   'chatbot.guard.handoff_on_complaint.hint': 'Detected by a classification call to the chat model.',
   'chatbot.guard.handoffMsg': 'Handoff message',
   'chatbot.err.required': 'This field is required.',
-  'chatbot.err.url': 'Use an https:// URL (or http://localhost).',
+  'chatbot.err.url': 'Use a public https:// URL.',
   'chatbot.err.headerName': 'Use only letters, digits and dashes.',
   'chatbot.err.headerDup': 'This header is already listed.',
   'chatbot.err.key': 'The key needs 8 to 512 characters and no spaces.',

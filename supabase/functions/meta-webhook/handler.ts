@@ -19,13 +19,19 @@ export async function validSignature(body: string, header: string | null, secret
     "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
   );
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)));
-  const expected = "sha256=" + Array.from(mac, (b) => b.toString(16).padStart(2, "0")).join("");
-  // Constant-time compare.
-  if (expected.length !== header.length) return false;
+  return safeEqual("sha256=" + Array.from(mac, (b) => b.toString(16).padStart(2, "0")).join(""), header);
+}
+
+// Constant-time compare (length still leaks, which is public anyway).
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
   let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ header.charCodeAt(i);
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
 }
+
+// Meta batches are a few KB; anything far bigger is not from Meta.
+export const MAX_BODY_BYTES = 1024 * 1024;
 
 type MessagingItem = {
   sender?: { id?: string };
@@ -70,12 +76,20 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
   const url = new URL(req.url);
 
   if (req.method === "GET") {
-    const ok = url.searchParams.get("hub.mode") === "subscribe" && url.searchParams.get("hub.verify_token") === deps.verifyToken;
+    const ok = url.searchParams.get("hub.mode") === "subscribe" &&
+      safeEqual(url.searchParams.get("hub.verify_token") ?? "", deps.verifyToken);
     return ok ? new Response(url.searchParams.get("hub.challenge") ?? "") : new Response("Forbidden", { status: 403 });
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return new Response("Payload Too Large", { status: 413 });
   const body = await req.text();
+  if (new TextEncoder().encode(body).length > MAX_BODY_BYTES) return new Response("Payload Too Large", { status: 413 });
+  // An empty key makes importKey throw; say why instead of crashing on every signed delivery.
+  if (!deps.appSecret) {
+    console.error("meta-webhook: META_APP_SECRET is not set");
+    return new Response("Webhook not configured", { status: 500 });
+  }
   if (!(await validSignature(body, req.headers.get("x-hub-signature-256"), deps.appSecret))) {
     return new Response("Invalid signature", { status: 401 });
   }

@@ -115,7 +115,7 @@ export function changes(saved: Draft, draft: Draft): string[] {
   return paths
 }
 
-const URL_RE = /^(https:\/\/|http:\/\/localhost(:[0-9]+)?(\/|$))/
+const URL_RE = /^https:\/\/[^/?#@\s]+/
 const HEADER_RE = /^[A-Za-z0-9-]+$/
 const isInt = (s: string) => /^\d+$/.test(s.trim())
 

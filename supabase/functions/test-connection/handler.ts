@@ -8,18 +8,11 @@ export type Deps = {
   chat: typeof chat;
 };
 
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
-  "access-control-allow-methods": "POST, OPTIONS",
-};
-
 function json(body: unknown, status = 200) {
-  return Response.json(body, { status, headers: CORS });
+  return Response.json(body, { status });
 }
 
 export async function handle(req: Request, deps: Deps): Promise<Response> {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
   const token = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.6";
-import { type Deps, handler, type Target, toRows, userTargets, validSignature } from "./handler.ts";
+import { type Deps, handler, MAX_BODY_BYTES, type Target, toRows, userTargets, validSignature } from "./handler.ts";
 
 const SECRET = "test-app-secret";
 
@@ -122,4 +122,25 @@ Deno.test("the reply engine is triggered only after a successful store", async (
   const echoesOnly = fakeDeps();
   await post({ object: "page", entry: [{ id: PAGE, messaging: [echo, delivery] }] }, echoesOnly.deps);
   assertEquals(echoesOnly.triggered, [[]]);
+});
+
+Deno.test("a body over the size limit is rejected before the signature check", async () => {
+  const { deps, stored } = fakeDeps();
+  const big = { object: "page", entry: [], pad: "x".repeat(MAX_BODY_BYTES) };
+  assertEquals((await post(big, deps)).status, 413);
+  assertEquals(stored.length, 0);
+});
+
+Deno.test("a missing app secret fails closed with a clear 500, never accepting the event", async () => {
+  const { deps, stored } = fakeDeps();
+  const errors: unknown[] = [];
+  const realError = console.error;
+  console.error = (...args: unknown[]) => errors.push(args.join(" "));
+  try {
+    const res = await post(payload, { ...deps, appSecret: "" }, "sha256=00");
+    assertEquals([res.status, await res.text()], [500, "Webhook not configured"]);
+  } finally {
+    console.error = realError;
+  }
+  assertEquals([stored.length, errors], [0, ["meta-webhook: META_APP_SECRET is not set"]]);
 });

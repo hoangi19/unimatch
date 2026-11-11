@@ -38,6 +38,8 @@ it('requires model and base URL only for the active provider', () => {
   expect(validate(draft)).toEqual({ 'custom.base_url': 'chatbot.err.required', 'custom.model': 'chatbot.err.required' })
   draft.providers.custom.base_url = 'http://localhost:8000/v1'
   draft.providers.custom.model = 'qwen'
+  expect(validate(draft)).toEqual({ 'custom.base_url': 'chatbot.err.url' })
+  draft.providers.custom.base_url = 'https://llm.example.com/v1'
   expect(validate(draft)).toEqual({})
 })
 

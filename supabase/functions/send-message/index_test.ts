@@ -42,11 +42,6 @@ function post(token: string | null, body: unknown = { conversation_id: CONV, tex
   return new Request("http://localhost/send-message", { method: "POST", headers, body: JSON.stringify(body) });
 }
 
-Deno.test("OPTIONS answers CORS", async () => {
-  const res = await handle(new Request("http://localhost/send-message", { method: "OPTIONS" }), deps().d);
-  assertEquals(res.headers.get("access-control-allow-origin"), "*");
-});
-
 Deno.test("no token, bad token and non-admin never send", async () => {
   for (const [token, status] of [[null, 401], ["forged", 401], ["user-token", 403]] as const) {
     const { d, sends } = deps();

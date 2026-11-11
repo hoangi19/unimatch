@@ -2,6 +2,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { messengerDeps } from "../_shared/messenger/db.ts";
 import { sendText } from "../_shared/messenger/send.ts";
+import { withCors } from "../_shared/cors.ts";
 import { handle } from "./handler.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -10,7 +11,7 @@ const messenger = messengerDeps(db);
 const failedAdmin = <Q extends { eq(column: string, value: string): Q }>(query: Q, id: string, conversationId: string) =>
   query.eq("id", id).eq("conversation_id", conversationId).eq("sender_kind", "admin").eq("delivery_status", "failed");
 
-Deno.serve((req) =>
+Deno.serve(withCors((req) =>
   handle(req, {
     getUser: async (token) => (await db.auth.getUser(token)).data.user,
     findConversation: async (id) => {
@@ -35,4 +36,4 @@ Deno.serve((req) =>
       if (error) throw new Error(error.message);
     },
   })
-);
+));
