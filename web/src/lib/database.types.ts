@@ -110,6 +110,7 @@ export type Database = {
           created_at: string
           customer_name: string | null
           customer_picture_url: string | null
+          customer_profile_at: string | null
           handoff_at: string | null
           handoff_reason: string | null
           id: string
@@ -130,6 +131,7 @@ export type Database = {
           created_at?: string
           customer_name?: string | null
           customer_picture_url?: string | null
+          customer_profile_at?: string | null
           handoff_at?: string | null
           handoff_reason?: string | null
           id?: string
@@ -150,6 +152,7 @@ export type Database = {
           created_at?: string
           customer_name?: string | null
           customer_picture_url?: string | null
+          customer_profile_at?: string | null
           handoff_at?: string | null
           handoff_reason?: string | null
           id?: string
@@ -398,6 +401,10 @@ export type Database = {
           conversation_id: string
           reply_up_to: string
         }[]
+      }
+      claim_customer_profile: {
+        Args: { p_page_id: string; p_psid: string }
+        Returns: boolean
       }
       clear_page_token: { Args: { p_page_id: string }; Returns: undefined }
       delete_customer_data: { Args: { p_psid: string }; Returns: Json }
