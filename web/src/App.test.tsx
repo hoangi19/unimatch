@@ -34,12 +34,11 @@ it('opens a deep link and moves between tabs with history', () => {
   expect(heading.textContent).toBe('Trang Facebook')
 })
 
-it('keeps the Dataset tab disabled', () => {
+it('opens the Dataset tab', () => {
   render(<App auth={admin()} />)
-  const dataset = screen.getByRole('link', { name: /Dữ liệu/ })
-  expect(dataset.getAttribute('aria-disabled')).toBe('true')
-  fireEvent.click(dataset)
-  expect(location.pathname).toBe('/inbox')
+  fireEvent.click(screen.getByRole('link', { name: /Dữ liệu/ }))
+  expect(location.pathname).toBe('/dataset')
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Dữ liệu')
 })
 
 it('switches language and remembers it', () => {

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatbotApi } from './chatbot/api'
 import { Chatbot } from './chatbot/Chatbot'
+import type { DatasetData } from './dataset/data'
+import { DatasetTab } from './dataset/DatasetTab'
 import { usePageHealth, type PageHealth } from './health'
 import { LANGS, useI18n, type MessageKey } from './i18n'
 import type { InboxData } from './inbox/data'
@@ -16,13 +18,18 @@ import { Icon, Logo, type IconName } from './ui/Icon'
 export type SystemStatus = { webhook?: string; ai?: string; botOn?: boolean }
 
 const TAB_ICONS: Record<Tab, IconName> = { inbox: 'inbox', pages: 'facebook', dataset: 'database', chatbot: 'bot' }
-// The Dataset tab is out of product scope for now: shown, but disabled.
-const DISABLED: ReadonlySet<Tab> = new Set(['dataset'])
 
 /** Tabs render their placeholder until their data source is passed in. */
-type ShellProps = { status?: SystemStatus; onSignOut?: () => void; inboxData?: InboxData; pagesData?: PagesData; chatbot?: ChatbotApi }
+type ShellProps = {
+  status?: SystemStatus
+  onSignOut?: () => void
+  inboxData?: InboxData
+  pagesData?: PagesData
+  datasetData?: DatasetData
+  chatbot?: ChatbotApi
+}
 
-export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }: ShellProps) {
+export function Shell({ status = {}, onSignOut, inboxData, pagesData, datasetData, chatbot }: ShellProps) {
   const { t } = useI18n()
   const { tab, navigate } = useTab()
   const [navOpen, setNavOpen] = useState(false)
@@ -80,6 +87,8 @@ export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }:
             <InboxTab data={inboxData} onConnectPage={() => go('pages')} />
           ) : tab === 'pages' && pagesData ? (
             <PagesTab data={pagesData} />
+          ) : tab === 'dataset' && datasetData ? (
+            <DatasetTab data={datasetData} />
           ) : tab === 'chatbot' && chatbot ? (
             <Chatbot api={chatbot} />
           ) : (
@@ -93,21 +102,18 @@ export function Shell({ status = {}, onSignOut, inboxData, pagesData, chatbot }:
 
 function NavItem({ tab, current, onGo, unread }: { tab: Tab; current: boolean; onGo: (tab: Tab) => void; unread: number }) {
   const { t } = useI18n()
-  const disabled = DISABLED.has(tab)
   return (
     <a
       href={`/${tab}`}
       className="nav-btn"
       aria-current={current ? 'page' : undefined}
-      aria-disabled={disabled || undefined}
       onClick={(e) => {
         e.preventDefault()
-        if (!disabled) onGo(tab)
+        onGo(tab)
       }}
     >
       <Icon name={TAB_ICONS[tab]} />
       {t(`tab.${tab}`)}
-      {disabled && <span className="count">{t('nav.soon')}</span>}
       {unread > 0 && (
         <span className="count" aria-label={t('inboxLive.unreadTotal', { n: unread })}>
           {unread > 99 ? '99+' : unread}
@@ -248,9 +254,8 @@ function HealthBanner({ invalid, onReconnect }: { invalid: number; onReconnect: 
 
 function TabPlaceholder({ tab }: { tab: Tab }) {
   const { t } = useI18n()
-  const soon = DISABLED.has(tab)
   return (
-    <EmptyState icon={TAB_ICONS[tab]} title={t(soon ? 'empty.soonTitle' : 'empty.title')}>
+    <EmptyState icon={TAB_ICONS[tab]} title={t('empty.title')}>
       {t(`empty.${tab}`)}
     </EmptyState>
   )
