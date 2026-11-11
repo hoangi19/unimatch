@@ -1,0 +1,97 @@
+import type { ReactNode } from 'react'
+
+// Lucide paths (ISC), inlined because the app needs only a handful.
+const PATHS = {
+  inbox: (
+    <>
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </>
+  ),
+  facebook: <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />,
+  database: (
+    <>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M3 5V19A9 3 0 0 0 21 19V5" />
+      <path d="M3 12A9 3 0 0 0 21 12" />
+    </>
+  ),
+  bot: (
+    <>
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2M20 14h2M15 13v2M9 13v2" />
+    </>
+  ),
+  webhook: (
+    <>
+      <path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2" />
+      <path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06" />
+      <path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4M22 5h-4" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2m-7.07-17.07 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </>
+  ),
+  moon: <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />,
+  logout: (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5M21 12H9" />
+    </>
+  ),
+  menu: <path d="M4 12h16M4 6h16M4 18h16" />,
+  x: <path d="M18 6 6 18M6 6l12 12" />,
+  'chevron-down': <path d="m6 9 6 6 6-6" />,
+  check: <path d="M20 6 9 17l-5-5" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
+    </>
+  ),
+  alert: (
+    <>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+      <path d="M12 9v4M12 17h.01" />
+    </>
+  ),
+} satisfies Record<string, ReactNode>
+
+export type IconName = keyof typeof PATHS
+
+export function Icon({ name, className = 'ic' }: { name: IconName; className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {PATHS[name]}
+    </svg>
+  )
+}
+
+export function Logo() {
+  return (
+    <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="8" fill="var(--primary)" />
+      <path d="M10 9v8a6 6 0 0 0 12 0V9" stroke="var(--on-primary)" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <circle cx="24.5" cy="7.5" r="2.5" fill="var(--accent)" />
+    </svg>
+  )
+}
