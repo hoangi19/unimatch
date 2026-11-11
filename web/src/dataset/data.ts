@@ -1,4 +1,5 @@
 // What the Dataset tab needs from the outside world. Injected so tests run without Supabase.
+import type { MessageKey } from '../i18n'
 import type { Tables } from '../lib/database.types'
 
 export const JOB_SOURCES = ['linkedin', 'facebook_group'] as const
@@ -40,7 +41,16 @@ export type JobDetail = Pick<
 export type JobQuery = { q: string; source: string; type: string; seniority: string }
 export const NO_QUERY: JobQuery = { q: '', source: '', type: '', seniority: '' }
 
-export type JobStats = { total: number; bySource: Record<JobSource, number>; recent: number }
+export type JobStats = { total: number; bySource: Record<JobSource, number>; recent: number; embedded: number }
+
+/** The job embedding model (embedding_model row). The key itself never reaches the browser, only its hint. */
+export type EmbeddingRow = Pick<Tables<'embedding_model'>, 'provider' | 'base_url' | 'model' | 'dims' | 'key_hint' | 'key_saved_at'>
+/** A key of null removes the saved key; undefined leaves it alone. */
+export type EmbeddingChange = { base_url?: string; model?: string; key?: string | null }
+export type EmbedTestErrorKind = 'auth' | 'rate_limit' | 'timeout' | 'bad_config' | 'bad_request' | 'provider' | 'refused'
+export type EmbedTestResult =
+  | { ok: true; model: string; dims: number; latencyMs: number }
+  | { ok: false; error: { kind: EmbedTestErrorKind; message: string } }
 export type Facets = { types: string[]; seniorities: string[] }
 
 export type DatasetData = {
@@ -52,6 +62,34 @@ export type DatasetData = {
   loadJob(source: string, externalId: string): Promise<JobDetail>
   /** Distinct employment types and seniority levels for the filters. */
   loadFacets(): Promise<Facets>
+  /** Throws on a database error. */
+  loadEmbedding(): Promise<EmbeddingRow>
+  /** Saves the connection, then the key; throws with the database message (never the key). */
+  saveEmbedding(change: EmbeddingChange): Promise<void>
+  /** `test-embedding` Edge Function: embeds a sample text with the saved config and checks the vector size. */
+  testEmbedding(): Promise<EmbedTestResult>
+}
+
+export type EmbeddingForm = { base_url: string; model: string; key: string; removeKey: boolean }
+
+/** Only what changed; null removes the saved key. */
+export function embeddingChange(row: EmbeddingRow, form: EmbeddingForm): EmbeddingChange {
+  const change: EmbeddingChange = {}
+  if (form.base_url.trim() !== row.base_url) change.base_url = form.base_url.trim()
+  if (form.model.trim() !== row.model) change.model = form.model.trim()
+  if (form.key.trim()) change.key = form.key.trim()
+  else if (form.removeKey) change.key = null
+  return change
+}
+
+/** Field errors as message keys; mirrors the embedding_model checks and set_embedding_key. */
+export function embeddingErrors(form: EmbeddingForm) {
+  const errors: Partial<Record<'base_url' | 'model' | 'key', MessageKey>> = {}
+  if (!/^https:\/\/\S+$/.test(form.base_url.trim()) || form.base_url.trim().length > 500) errors.base_url = 'dataset.emb.err.baseUrl'
+  if (!form.model.trim() || form.model.trim().length > 200) errors.model = 'dataset.emb.err.model'
+  const key = form.key.trim()
+  if (key && (key.length < 8 || key.length > 512 || /\s/.test(key))) errors.key = 'dataset.emb.err.key'
+  return errors
 }
 
 /** Yesterday as a local YYYY-MM-DD date: "posted in the last 24h" is posted_at >= this. */

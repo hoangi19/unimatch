@@ -11,10 +11,25 @@ export const HISTORY_CHARS = 8_000;
 // Re-runs after a turn when messages keep arriving; bounds one background invocation.
 const MAX_TURNS = 3;
 
-// Retrieval hook for a later search_jobs tool (Dataset tab). Not called yet.
-export type JobQuery = { query: string; location?: string; remote?: boolean; seniority?: string; topK?: number };
-export type Job = { title: string; company: string; location: string; url: string };
-export type SearchJobs = (query: JobQuery) => Promise<Job[]>;
+// Job search before each reply (pre-retrieval, so it works with every chat provider): embed the customer's
+// recent texts, take the nearest jobs and list them under the system prompt.
+export type Job = {
+  title: string;
+  company: string | null;
+  location: string | null;
+  salary: string | null;
+  type: string | null;
+  url: string | null;
+  similarity: number;
+};
+export type SearchJobs = (query: string, count: number) => Promise<{ model: string; jobs: Job[] }>;
+export const JOB_COUNT = 5;
+// Cosine similarity floor; below it a job is not a match. Tuned in live tests.
+export const MIN_SIMILARITY = 0.45;
+export const SEARCH_TIMEOUT_MS = 5_000;
+const QUERY_CHARS = 1_000;
+// Earlier customer messages added to the query, so a follow-up ("còn ở HCM thì sao?") keeps its topic.
+const QUERY_EARLIER = 2;
 
 // The per-page reply settings are optional so the engine also runs before those columns exist.
 export type Page = {
@@ -207,8 +222,55 @@ const LANGUAGE_LINE = {
   auto: "Reply in the language of the customer's latest message.",
 };
 
-export function buildPrompt(settings: Settings, pageName: string, history: HistoryMessage[]): ChatMessage[] {
-  const system = `${settings.system_prompt.replaceAll("{{page_name}}", pageName)}\n\n${LANGUAGE_LINE[settings.language]}`;
+// The search query: this turn's customer texts plus a few earlier ones, newest kept when it runs long.
+export function jobQuery(history: HistoryMessage[], newCustomerTexts: string[]): string {
+  const texts = history.filter((m) => m.sender_kind === "user" && m.text).map((m) => m.text!);
+  const recent = texts.slice(-(newCustomerTexts.length + QUERY_EARLIER));
+  return (recent.length ? recent : newCustomerTexts).join("\n").slice(-QUERY_CHARS).trim();
+}
+
+// undefined: no search wired (the prompt gets no job section). null: the search failed.
+export type Jobs = Job[] | null | undefined;
+export type Found = { jobs: Jobs; retrieval?: Record<string, unknown> };
+
+// Never throws: a failed search means "no job list", and the prompt tells the model not to name jobs.
+export async function findJobs(search: SearchJobs | undefined, query: string): Promise<Found> {
+  if (!search) return { jobs: undefined };
+  if (!query) return { jobs: [], retrieval: { count: 0 } };
+  const started = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new AiError("timeout", "Job search timed out")), SEARCH_TIMEOUT_MS);
+    });
+    const { model, jobs } = await Promise.race([search(query, JOB_COUNT), timeout]);
+    const matched = jobs.filter((j) => j.similarity >= MIN_SIMILARITY).slice(0, JOB_COUNT);
+    return { jobs: matched, retrieval: { model, count: matched.length, latencyMs: Date.now() - started } };
+  } catch (e) {
+    const error = e instanceof AiError ? e.kind : "internal";
+    // Never log the query: it is customer text.
+    console.error(JSON.stringify({ event: "job_search", error, latencyMs: Date.now() - started }));
+    return { jobs: null, retrieval: { error, latencyMs: Date.now() - started } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The job section under the system prompt; the seeded prompt refers to it as "Matching jobs".
+export function jobSection(jobs: Job[] | null): string {
+  if (jobs === null) {
+    return "## Matching jobs\nThe job search is unavailable right now. Do not name any specific job, company, salary or link.";
+  }
+  if (!jobs.length) return "## Matching jobs\nNo job in the system matches this conversation.";
+  const lines = jobs.map((j, i) =>
+    `${i + 1}. ${[j.title, j.company, j.location, j.salary && `Lương: ${j.salary}`, j.type, j.url].filter(Boolean).join(" | ")}`
+  );
+  return `## Matching jobs\nFrom the system's job search, best match first. Recommend only these, with links exactly as written.\n${lines.join("\n")}`;
+}
+
+export function buildPrompt(settings: Settings, pageName: string, history: HistoryMessage[], jobs?: Jobs): ChatMessage[] {
+  const section = jobs === undefined ? "" : `\n\n${jobSection(jobs)}`;
+  const system = `${settings.system_prompt.replaceAll("{{page_name}}", pageName)}${section}\n\n${LANGUAGE_LINE[settings.language]}`;
   // Newest messages first until the budget runs out; same-role neighbours merge because some APIs need alternation.
   const turns: ChatMessage[] = [];
   let chars = 0;
@@ -235,8 +297,9 @@ export async function generate(
   settings: Settings,
   pageName: string,
   history: HistoryMessage[],
+  jobs?: Jobs,
 ): Promise<Generated> {
-  const result = await chat(config, buildPrompt(settings, pageName, history), {
+  const result = await chat(config, buildPrompt(settings, pageName, history, jobs), {
     maxTokens: settings.max_tokens, temperature: Number(settings.temperature),
   });
   const text = result.text.trim().slice(0, MAX_TEXT);
@@ -273,10 +336,12 @@ async function reply(deps: Deps, page: Page, psid: string, conversationId: strin
     trace.refused = "off_topic_or_abuse";
     text = settings.guardrails.off_topic_message?.trim() || settings.fallback;
   } else {
+    const { jobs, retrieval } = await findJobs(deps.searchJobs, jobQuery(turn.history, turn.newCustomerTexts));
+    if (retrieval) trace.retrieval = retrieval;
     try {
       const config = await deps.loadProvider(settings.active_provider);
       trace.model = config.model;
-      const { text: reply, ...rest } = await generate(deps.chat, config, settings, page.name, turn.history);
+      const { text: reply, ...rest } = await generate(deps.chat, config, settings, page.name, turn.history, jobs);
       Object.assign(trace, rest);
       text = reply;
     } catch (e) {

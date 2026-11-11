@@ -5,7 +5,7 @@ import { Button, Input, Toggle } from '../ui/controls'
 import { Modal } from '../ui/Dialog'
 import { Icon } from '../ui/Icon'
 import { useToast } from '../ui/toast-context'
-import { EMBED_PROVIDERS, MOCK_EMBED, mockEmbedStatus, RUN_STEPS, runStep, type EmbedSettings } from './mock'
+import { MOCK_CHUNKING, mockEmbedStatus, RUN_STEPS, runStep, type ChunkSettings } from './mock'
 import { SourceBadge } from './SourceBadge'
 import { useFakeProgress, type useMockCrawl } from './useMock'
 
@@ -174,97 +174,50 @@ export function HistoryCard({ crawl }: { crawl: MockCrawl }) {
   )
 }
 
-export function EmbedCard({ total }: { total: number }) {
+/** Chunking and re-index controls inside the embedding card. Demo only: the real chunking is fixed in embed-jobs. */
+export function ChunkingDemo({ total }: { total: number }) {
   const { t, fmt } = useI18n()
   const toast = useToast()
-  const [saved, setSaved] = useState<EmbedSettings>(MOCK_EMBED)
-  const [form, setForm] = useState<EmbedSettings>(MOCK_EMBED)
+  const [form, setForm] = useState<ChunkSettings>(MOCK_CHUNKING)
   const [confirm, setConfirm] = useState(false)
   const onDone = useCallback(() => toast({ kind: 'success', title: t('dataset.emb.done') }), [t, toast])
   const { runs, start } = useFakeProgress(onDone)
   const pct = runs.reindex
-  const models = EMBED_PROVIDERS[form.provider].models
-  const changed = form.provider !== saved.provider || form.model !== saved.model
-  const set = (patch: Partial<EmbedSettings>) => setForm((f) => ({ ...f, ...patch }))
-  const num = (key: 'chunkSize' | 'overlap' | 'retention') => ({
+  const num = (key: keyof ChunkSettings) => ({
     type: 'number',
     inputMode: 'numeric' as const,
     value: String(form[key]),
-    onChange: (e: ChangeEvent<HTMLInputElement>) => set({ [key]: Number(e.target.value) }),
+    onChange: (e: ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [key]: Number(e.target.value) })),
   })
 
   const reindex = () => {
     setConfirm(false)
-    setSaved(form)
     start('reindex')
   }
 
   return (
-    <section className="card" aria-labelledby="ds-emb-title">
-      <div className="card-head">
-        <div>
-          <h3 id="ds-emb-title">
-            <Icon name="sparkles" />
-            {t('dataset.emb.title')}
-          </h3>
-          <p>{t('dataset.emb.sub')}</p>
-        </div>
+    <>
+      <div className="ds-row">
+        <h4 className="ds-h">{t('dataset.emb.chunking')}</h4>
         <DemoBadge />
       </div>
-      <div className="card-body">
-        <div className="field">
-          <label htmlFor="ds-emb-provider">{t('dataset.emb.provider')}</label>
-          <select
-            id="ds-emb-provider"
-            className="input"
-            value={form.provider}
-            onChange={(e) => set({ provider: e.target.value, model: Object.keys(EMBED_PROVIDERS[e.target.value].models)[0] })}
-          >
-            {Object.entries(EMBED_PROVIDERS).map(([id, p]) => (
-              <option key={id} value={id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="ds-emb-model">{t('dataset.emb.model')}</label>
-          <select id="ds-emb-model" className="input" value={form.model} onChange={(e) => set({ model: e.target.value })}>
-            {Object.entries(models).map(([id, dims]) => (
-              <option key={id} value={id}>
-                {`${id} · ${t('dataset.emb.dims', { n: fmt.number(dims) })}`}
-              </option>
-            ))}
-          </select>
-          <p className="hint">{t('dataset.emb.modelHint')}</p>
-        </div>
-        {changed && (
-          <div className="callout callout-warning" role="status">
-            <Icon name="alert" />
-            <div className="callout-body">{t('dataset.emb.changeWarn', { n: fmt.number(total) })}</div>
-          </div>
-        )}
-        <div className="grid-2">
-          <Input label={t('dataset.emb.chunk')} hint={t('dataset.emb.chunkHint')} min={128} max={2048} step={32} {...num('chunkSize')} />
-          <Input label={t('dataset.emb.overlap')} hint={t('dataset.emb.overlapHint')} min={0} max={512} step={16} {...num('overlap')} />
-        </div>
-        <Input label={t('dataset.emb.retention')} hint={t('dataset.emb.retentionHint')} min={1} max={365} {...num('retention')} />
-        {pct !== undefined && (
-          <div className="run">
-            <Progress
-              pct={pct}
-              label={t('dataset.emb.reindexBar')}
-              text={t('dataset.emb.reindexing', { a: fmt.number(Math.round((pct / 100) * total)), b: fmt.number(total) })}
-            />
-          </div>
-        )}
+      <div className="grid-2">
+        <Input label={t('dataset.emb.chunk')} hint={t('dataset.emb.chunkHint')} min={128} max={2048} step={32} {...num('chunkSize')} />
+        <Input label={t('dataset.emb.overlap')} hint={t('dataset.emb.overlapHint')} min={0} max={512} step={16} {...num('overlap')} />
       </div>
-      <div className="card-foot ds-foot">
-        <span className="hint mono">{`HNSW · cosine · vector(${EMBED_PROVIDERS[saved.provider].models[saved.model]})`}</span>
-        <Button size="sm" icon="rotate" disabled={pct !== undefined} onClick={() => setConfirm(true)}>
-          {t('dataset.emb.reindex')}
-        </Button>
-      </div>
+      <Input label={t('dataset.emb.retention')} hint={t('dataset.emb.retentionHint')} min={1} max={365} {...num('retention')} />
+      {pct !== undefined && (
+        <div className="run">
+          <Progress
+            pct={pct}
+            label={t('dataset.emb.reindexBar')}
+            text={t('dataset.emb.reindexing', { a: fmt.number(Math.round((pct / 100) * total)), b: fmt.number(total) })}
+          />
+        </div>
+      )}
+      <Button size="sm" icon="rotate" className="self-start" disabled={pct !== undefined} onClick={() => setConfirm(true)}>
+        {t('dataset.emb.reindex')}
+      </Button>
       <Modal
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -282,7 +235,7 @@ export function EmbedCard({ total }: { total: number }) {
       >
         <p>{t('dataset.emb.confirmBody', { n: fmt.number(total) })}</p>
       </Modal>
-    </section>
+    </>
   )
 }
 

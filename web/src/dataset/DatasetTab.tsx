@@ -16,7 +16,8 @@ import {
   type JobStats,
 } from './data'
 import { JobDrawer } from './JobDrawer'
-import { DemoBadge, EmbedCard, HistoryCard, SourcesCard } from './MockCards'
+import { EmbedCard } from './EmbedCard'
+import { DemoBadge, HistoryCard, SourcesCard } from './MockCards'
 import { SourceBadge } from './SourceBadge'
 import { useMockCrawl } from './useMock'
 import './dataset.css'
@@ -164,7 +165,7 @@ export function DatasetTab({ data }: { data: DatasetData }) {
       <SourcesCard crawl={crawl} />
 
       <div className="data-bottom">
-        <EmbedCard total={total} />
+        <EmbedCard data={data} total={total} />
         <HistoryCard crawl={crawl} />
       </div>
 
@@ -191,6 +192,7 @@ function StatCards({ stats, onRetry }: { stats: JobStats | null | 'error'; onRet
     ['search', t('dataset.source.linkedin'), stats?.bySource.linkedin, share(stats?.bySource.linkedin ?? 0)],
     ['facebook', t('dataset.source.facebook_group'), stats?.bySource.facebook_group, share(stats?.bySource.facebook_group ?? 0)],
     ['clock', t('dataset.stat.recent'), stats?.recent, t('dataset.stat.recentNote')],
+    ['sparkles', t('dataset.stat.embedded'), stats?.embedded, share(stats?.embedded ?? 0)],
   ]
   return (
     <div className="stats">

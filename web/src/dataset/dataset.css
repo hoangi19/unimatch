@@ -13,7 +13,7 @@
   .kv { display: grid; gap: 4px; }
   .kv dt { font-size: var(--text-xs); color: var(--muted-fg); }
   .kv dd { margin: 0; }
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
   .stat { padding: 14px 16px; display: grid; gap: 6px; }
   .stat .k { font-size: var(--text-sm); color: var(--muted-fg); display: flex; align-items: center; gap: 6px; }
   .stat .k .ic { width: 14px; height: 14px; }
@@ -66,6 +66,8 @@
   .ds-nowrap { white-space: nowrap; }
   .ds-more { text-align: center; padding: 8px; }
   .ds-foot { justify-content: space-between; }
+  .ds-emb .grid-2 { gap: var(--space-xl); }
+  .ds-emb .self-start { justify-self: start; }
   .ds-detail, .ds-block { display: grid; gap: var(--space-lg); }
   .ds-block { gap: 8px; }
   .ds-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

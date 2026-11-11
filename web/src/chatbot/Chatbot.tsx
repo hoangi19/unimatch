@@ -494,8 +494,8 @@ type KeyFieldProps = {
   onChange: (patch: Partial<KeyForm>) => void
 }
 
-/** Write-only: the saved key is shown only as its hint; a new key lives in the draft until Save sends it. */
-function KeyField({ id, row, form, error, onChange }: KeyFieldProps) {
+/** Write-only: the saved key is shown only as its hint; a new key lives in the draft until Save sends it. Also used by the Dataset tab. */
+export function KeyField({ id, row, form, error, onChange }: KeyFieldProps) {
   const { t, fmt } = useI18n()
   const [shown, setShown] = useState(false)
   const [replacing, setReplacing] = useState(false)

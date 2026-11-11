@@ -3,7 +3,7 @@
 // No rate limit: callers are admins (sign-up is off), the input is bounded, chat() has a timeout and the UI
 // keeps one request in flight. A per-isolate counter would be unreliable and a DB counter needs a table.
 import { AiError, type chat, PROVIDER_KINDS, type ProviderKind } from "../_shared/ai/chat.ts";
-import { generate, type HistoryMessage, keywordHandoff, type Settings } from "../_shared/bot/engine.ts";
+import { findJobs, generate, type HistoryMessage, jobQuery, keywordHandoff, type SearchJobs, type Settings } from "../_shared/bot/engine.ts";
 
 export type Deps = {
   // Verifies the token with Supabase Auth; null when missing, expired or invalid.
@@ -13,6 +13,8 @@ export type Deps = {
   // The saved Vault key; throws AiError bad_config when none is saved.
   loadKey(kind: ProviderKind): Promise<string>;
   chat: typeof chat;
+  // Same job search as the live bot, so the dry run sees the same job list.
+  searchJobs?: SearchJobs;
 };
 
 // Mirrors the bot_settings table checks and the Chatbot tab's validation.
@@ -96,14 +98,17 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     };
     const history: HistoryMessage[] = messages.map((m) => ({ sender_kind: m.role, text: m.text }));
     const full: Settings = { ...settings, active_provider: provider.kind, fallback: "", rate_limit_per_hour: 0 };
+    const latest = messages.slice(lastBot + 1).map((m) => m.text);
+    const { jobs, retrieval } = await findJobs(deps.searchJobs, jobQuery(history, latest));
     const { text, ...rest } = await generate(
       (c, m, p) => deps.chat(c, m, p, { timeoutMs: 30_000, retries: 0 }),
       config,
       full,
       page.name,
       history,
+      jobs,
     );
-    return json({ ok: true, text, trace: { provider: provider.kind, ...rest, handoff: null } });
+    return json({ ok: true, text, trace: { provider: provider.kind, ...rest, ...(retrieval && { retrieval }), handoff: null } });
   } catch (e) {
     if (e instanceof AiError) return json({ ok: false, error: { kind: e.kind, message: e.message } });
     console.error("test-chat failed", e instanceof Error ? e.message : "unknown error");
