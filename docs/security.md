@@ -101,11 +101,24 @@ not worth it now.
 
 ## After deploy (PM)
 
+Results of the first run (2026-11-11, after #63 and #64):
+
 1. `curl -X POST -H 'x-hub-signature-256: sha256=00' -d '{}' …/meta-webhook`: 500 "Webhook not
-   configured" until the secret is set, 401 after.
-2. 2 MiB POST to `meta-webhook`: 413.
-3. `curl -i -X OPTIONS -H 'Origin: https://evil.example' …/test-connection`: no
+   configured" until the secret is set, 401 after. **Result:** 500, as expected without the secret.
+2. Oversized POST to `meta-webhook`: 413. **Result: accepted deviation.** Bodies up to 900 KB get an
+   answer at once. Above 1 MiB the hosted runtime never delivers the 413: curl uploads the whole body
+   and then times out, even though the handler stops reading at the cap (it answers 413 in about 5 ms
+   when run locally with `Deno.serve`). The same hang happens on any function that answers without
+   consuming a large body (e.g. 900 KB to `test-connection`), so it comes from the hosted runtime, not
+   from our code. Impact: only the sender's own connection hangs until the platform timeout; nothing is
+   read into memory past the cap, and nothing reaches the database.
+3. `curl -i -X OPTIONS -H 'Origin: https://evil.example' …/send-message`: no
    `access-control-allow-origin`. With `Origin: https://unimatch-1va.pages.dev` the origin is echoed.
+   **Result:** as expected.
 4. Console, Chatbot tab, "Test connection" on Hermes with no key saved: "No API key saved for this
-   provider". "Cannot verify provider host" means DNS is unavailable in the runtime.
+   provider". "Cannot verify provider host" means DNS is unavailable in the runtime. **Result:** "No API
+   key saved" for hermes, openai and anthropic, so DNS resolution works in the hosted runtime.
 5. Re-run `scripts/sql-test.sh supabase/tests/anon_access_test.sql` without the migration argument: passes.
+   **Result:** all 11 SQL tests pass on hosted.
+6. As the test admin over REST: updating `conversations.notes` works; updating `conversations.status`,
+   inserting into `messages`, and any anon read of `conversations` are denied.
