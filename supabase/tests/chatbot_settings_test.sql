@@ -89,7 +89,12 @@ begin
     assert false, 'plain http base_url accepted';
   exception when check_violation then null;
   end;
-  update public.ai_providers set base_url = 'http://localhost:8000/v1' where kind = 'custom';
+  begin
+    update public.ai_providers set base_url = 'http://localhost:8000/v1' where kind = 'custom';
+    assert false, 'http://localhost base_url accepted';
+  exception when check_violation then null;
+  end;
+  update public.ai_providers set base_url = 'https://llm.example.com/v1' where kind = 'custom';
   begin
     update public.bot_settings set temperature = 2;
     assert false, 'temperature 2 accepted';

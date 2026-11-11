@@ -255,7 +255,7 @@ export const vi: Record<MessageKey, string> = {
   'chatbot.guard.handoff_on_complaint.hint': 'Phát hiện bằng một lần gọi phân loại tới model chat.',
   'chatbot.guard.handoffMsg': 'Tin nhắn khi chuyển nhân viên',
   'chatbot.err.required': 'Vui lòng nhập trường này.',
-  'chatbot.err.url': 'Dùng URL https:// (hoặc http://localhost).',
+  'chatbot.err.url': 'Dùng URL https:// công khai.',
   'chatbot.err.headerName': 'Chỉ dùng chữ, số và dấu gạch ngang.',
   'chatbot.err.headerDup': 'Header này đã có trong danh sách.',
   'chatbot.err.key': 'Key cần từ 8 đến 512 ký tự và không có khoảng trắng.',

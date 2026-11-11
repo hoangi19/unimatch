@@ -59,12 +59,6 @@ function post(body: unknown, token: string | null = "admin-token") {
   return new Request("http://localhost/pages", { method: "POST", headers, body: JSON.stringify(body) });
 }
 
-Deno.test("CORS preflight is answered", async () => {
-  const res = await handle(new Request("http://localhost/pages", { method: "OPTIONS" }), deps().d);
-  assertEquals(res.status, 200);
-  assertEquals(res.headers.get("access-control-allow-origin"), "*");
-});
-
 Deno.test("no token, invalid token and non-admin never reach Facebook", async () => {
   for (const [token, status] of [[null, 401], ["forged", 401], ["user-token", 403]] as const) {
     const { d, calls } = deps();

@@ -195,3 +195,10 @@ Deno.test("redact strips the key, key-like tokens and caps the length", () => {
   assertEquals(redact("bad key sk-abc***wxyz", KEY), "bad key [redacted]");
   assertEquals(redact("word ".repeat(100), KEY).length, 200);
 });
+
+Deno.test("a redirect is not followed, so the key never reaches the redirect target", async () => {
+  await withFetch(() => new Response(null, { status: 307, headers: { location: "http://169.254.169.254/" } }), async (calls) => {
+    const e = await assertRejects(() => chat(config("custom"), [{ role: "user", content: "hi" }], { maxTokens: 64 }), AiError);
+    assertEquals([e.kind, calls.length], ["bad_config", 1]);
+  });
+});

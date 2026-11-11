@@ -56,6 +56,8 @@ export async function chat(
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        // A redirect would carry the key to a host the guard never checked.
+        redirect: "manual",
         signal: AbortSignal.timeout(Math.max(deadline - Date.now(), 1)),
       });
       text = await res.text();
@@ -70,6 +72,9 @@ export async function chat(
       throw logged(config, started, new AiError("provider", "Could not reach the provider"));
     }
 
+    if (res.status >= 300 && res.status < 400) {
+      throw logged(config, started, new AiError("bad_config", "Provider redirected the request; set the final URL as the base URL"), res.status);
+    }
     if (res.ok) {
       let json: unknown;
       try {

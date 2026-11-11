@@ -81,8 +81,3 @@ Deno.test("unexpected errors are 500 with a generic message", async () => {
   }
 });
 
-Deno.test("CORS preflight is answered without auth", async () => {
-  const res = await handle(new Request("http://localhost/test-connection", { method: "OPTIONS" }), deps());
-  assertEquals(res.status, 200);
-  assertEquals(res.headers.get("access-control-allow-origin"), "*");
-});

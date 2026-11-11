@@ -1,5 +1,6 @@
 // Pages tab: POST {action: "list" | "connect" | "disconnect", userToken?, pageId?} with the admin's Supabase session token.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { withCors } from "../_shared/cors.ts";
 import { handle } from "./handler.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -10,7 +11,7 @@ function check<T>({ data, error }: { data: T; error: { message: string } | null 
   return data;
 }
 
-Deno.serve((req) =>
+Deno.serve(withCors((req) =>
   handle(req, {
     getUser: async (token) => (await db.auth.getUser(token)).data.user,
     appSecret: Deno.env.get("META_APP_SECRET"),
@@ -22,4 +23,4 @@ Deno.serve((req) =>
     getPageToken: async (pageId) => check(await db.rpc("get_page_token", { p_page_id: pageId })) as string | null,
     clearPageToken: async (pageId) => void check(await db.rpc("clear_page_token", { p_page_id: pageId })),
   })
-);
+));

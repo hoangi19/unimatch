@@ -142,7 +142,3 @@ Deno.test("provider errors are ok:false; unexpected errors are 500 with a generi
   }
 });
 
-Deno.test("CORS preflight is answered without auth", async () => {
-  const res = await handle(new Request("http://localhost/test-chat", { method: "OPTIONS" }), deps().d);
-  assertEquals(res.headers.get("access-control-allow-origin"), "*");
-});
