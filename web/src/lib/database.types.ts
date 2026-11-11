@@ -322,6 +322,7 @@ export type Database = {
         }[]
       }
       clear_page_token: { Args: { p_page_id: string }; Returns: undefined }
+      delete_customer_data: { Args: { p_psid: string }; Returns: Json }
       finish_bot_turn: {
         Args: { p_conversation_id: string; p_up_to: string }
         Returns: boolean
