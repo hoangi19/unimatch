@@ -5,3 +5,4 @@ supabase/.branches/
 .worktrees/
 node_modules/
 dist/
+!.env.example
