@@ -1,6 +1,6 @@
 # Supabase workflow
 
-The hosted project is the only environment. There is no CI: checks, seeding and deploys run by hand on the maintainer's machine.
+The hosted project is the only environment. There is no CI: checks, seeding and deploys run by hand on the maintainer's machine. Operations (rotating credentials, reconnecting a Page, the bot not replying, replaying events) are in `docs/runbook.md`.
 
 ## Migrations
 

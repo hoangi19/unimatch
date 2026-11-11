@@ -64,11 +64,12 @@ function conversation(id: string, n: number, name: string, extra: Record<string,
   };
 }
 
-function message(n: number, conversationId: string, senderKind: string, text: string): Record<string, unknown> {
+function message(n: number, conversationId: string, senderKind: string, text: string | null, event?: Record<string, unknown>): Record<string, unknown> {
   return {
     conversation_id: conversationId,
     sender_kind: senderKind,
     text,
+    event: event ?? null,
     external_id: `${SEED_PREFIX}msg${n}`,
     created_at: `2026-01-01T00:00:0${n}Z`,
   };
@@ -115,7 +116,7 @@ export const REGISTRY: SeedEntry[] = [
       message(2, SEED_CONV_BOT, "bot", "Chào bạn! Bạn muốn tìm việc ở khu vực nào?"),
       message(3, SEED_CONV_BOT, "user", "Cảm ơn bạn"),
       message(4, SEED_CONV_NEEDS, "user", "gặp nhân viên"),
-      message(5, SEED_CONV_NEEDS, "system", "Handed off: user typed handoff keyword"),
+      message(5, SEED_CONV_NEEDS, "system", null, { code: "handoff", reason: "keyword", keyword: "gặp nhân viên" }),
     ],
     match: MESSAGES_MATCH,
   },
