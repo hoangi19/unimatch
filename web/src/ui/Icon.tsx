@@ -145,6 +145,8 @@ const PATHS = {
   ),
   paperclip: <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />,
   'check-check': <path d="M18 6 7 17l-5-5M22 10l-7.5 7.5L13 16" />,
+  loader: <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
+  external: <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />,
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof PATHS
