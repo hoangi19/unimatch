@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { formatter } from './format'
 import { I18nContext, LANG_KEY, storedLang, translate, type Lang, type Translate } from './core'
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -18,5 +19,5 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }
 
   const t: Translate = (key, params) => translate(lang, key, params)
-  return <I18nContext.Provider value={{ lang, setLang, t }}>{children}</I18nContext.Provider>
+  return <I18nContext.Provider value={{ lang, setLang, t, fmt: formatter(lang) }}>{children}</I18nContext.Provider>
 }

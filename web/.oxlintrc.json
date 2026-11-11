@@ -3,6 +3,9 @@
   "plugins": ["react", "typescript", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    // User-visible text goes through t(); only the brand, avatar initials and separators may be literal.
+    "react/jsx-no-literals": ["error", { "allowedStrings": ["UniMatch", "AD", ".", "·", ":", "/"] }]
+  },
+  "overrides": [{ "files": ["**/*.test.tsx"], "rules": { "react/jsx-no-literals": "off" } }]
 }

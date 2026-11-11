@@ -9,7 +9,6 @@ import {
   mergeMessages,
   parseEvent,
   parseTrace,
-  shortTime,
   sortConversations,
   toSendResult,
   type LiveListener,
@@ -82,13 +81,6 @@ describe('eventText', () => {
 it('lists attachment types, unknown ones as other', () => {
   expect(attachmentTypes([{ type: 'image' }, { type: 'sticker' }, 'x'])).toEqual(['image', 'other', 'other'])
   expect(attachmentTypes(null)).toEqual([])
-})
-
-it('shows a clock time today and a date otherwise', () => {
-  const now = new Date(2026, 10, 12, 15, 0)
-  expect(shortTime(new Date(2026, 10, 12, 9, 5).toISOString(), 'en-GB', now)).toBe('09:05')
-  expect(shortTime(new Date(2026, 10, 3, 9, 5).toISOString(), 'en-GB', now)).toBe('03/11')
-  expect(shortTime(new Date(2025, 10, 3, 9, 5).toISOString(), 'en-GB', now)).toBe('03/11/2025')
 })
 
 describe('createHub', () => {

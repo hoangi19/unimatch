@@ -155,7 +155,7 @@ function Topbar({ tab, title, navOpen, onOpenNav, onSignOut }: TopbarProps) {
       <div id="user-menu" className="menu" popover="auto">
         <div className="menu-panel" role="menu" aria-label={t('user.menu')}>
           <div className="menu-head">
-            <strong>Admin</strong>
+            <strong>{t('brand.admin')}</strong>
           </div>
           <button type="button" className="menu-item" role="menuitem" onClick={toggleTheme}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} />

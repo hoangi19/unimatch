@@ -92,7 +92,7 @@ describe('PagesTab', () => {
       ]),
     )
     expect(await screen.findByText('Facebook không còn chấp nhận token của Trang này.')).toBeTruthy()
-    expect(screen.getByText('Token của Trang hết hạn sau 2 ngày.')).toBeTruthy()
+    expect(screen.getByText('Token của Trang hết hạn ngày kia.')).toBeTruthy()
     expect(screen.getByText('Đã ngắt kết nối')).toBeTruthy()
     // A disconnected Page can be reconnected, not disconnected again.
     expect(screen.queryByRole('button', { name: 'Ngắt kết nối Gone' })).toBeNull()

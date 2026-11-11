@@ -67,7 +67,7 @@ export const en = {
   'pages.status.disconnecting': 'Disconnecting…',
   'pages.expiredTitle': 'Facebook no longer accepts this Page token.',
   'pages.expiredBody': 'Reconnect the Page so the bot can reply again.',
-  'pages.expiringTitle': 'Page token expires in {n} days.',
+  'pages.expiringTitle': 'Page token expires {when}.',
   'pages.expiringBody': 'Reconnect the Page before then to keep replies running.',
   'pages.disconnectedBody': 'The bot does not receive or answer messages for this Page. Reconnect it to resume.',
   'pages.autoReply': 'Auto-reply',
@@ -424,9 +424,6 @@ export const en = {
   'inboxStats.botPct': 'Handled by bot',
   'inboxStats.firstResponse': 'Avg first response',
   'inboxStats.waiting': 'Waiting for a person',
-  'inboxStats.seconds': '{n} s',
-  'inboxStats.minutes': '{n} min',
-  'inboxStats.hours': '{n} h',
 }
 
 export type MessageKey = keyof typeof en

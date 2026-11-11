@@ -27,7 +27,7 @@ describe('InboxStats', () => {
     expect(await screen.findByText('12')).toBeTruthy()
     expect(loadStats).toHaveBeenCalledWith('p1')
     expect(value('inboxStats.botPct')).toBe('75%')
-    expect(value('inboxStats.firstResponse')).toBe(t('inboxStats.seconds', { n: '1,8' }))
+    expect(value('inboxStats.firstResponse')).toBe('1,8 giây')
     expect(value('inboxStats.waiting')).toBe('2')
     expect(screen.getByText(t('inboxStats.waiting')).closest('.ib-stat')?.classList.contains('warn')).toBe(true)
   })

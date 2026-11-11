@@ -51,7 +51,7 @@ const fieldId = (path: string) => `cb-${path.replace(/\./g, '-')}`
 type Conn = { status: 'loading' } | { status: 'done'; result: TestResult }
 
 export function Chatbot({ api }: { api: ChatbotApi }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   const toast = useToast()
   const [saved, setSaved] = useState<Saved | null>(null)
   const [base, setBase] = useState<Draft | null>(null)
@@ -167,10 +167,10 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
       apply(await api.load())
       setConn({})
       toast({ kind: 'success', title: t('chatbot.save.done') })
-    } catch (e) {
+    } catch {
       // Part of the plan may have landed: refresh the baseline but keep the admin's draft.
       await api.load().then((rows) => (setSaved(rows), setBase(toDraft(rows))), () => {})
-      toast({ kind: 'error', title: t('chatbot.save.failed'), body: e instanceof Error ? e.message : undefined })
+      toast({ kind: 'error', title: t('chatbot.save.failed') })
     } finally {
       setSaving(false)
     }
@@ -337,7 +337,7 @@ export function Chatbot({ api }: { api: ChatbotApi }) {
                     aria-describedby={fieldId('settings.temperature') + '-note'}
                     onChange={(e) => setSettings({ temperature: Number(e.target.value) })}
                   />
-                  <output htmlFor={fieldId('settings.temperature')}>{s.temperature.toFixed(1)}</output>
+                  <output htmlFor={fieldId('settings.temperature')}>{fmt.number(s.temperature, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</output>
                 </div>
                 <div className="range-scale" aria-hidden="true">
                   <span>{t('chatbot.gen.precise')}</span>
@@ -472,13 +472,13 @@ type KeyFieldProps = { id: string; row: ProviderRow; form: ProviderForm; error?:
 
 /** Write-only: the saved key is shown only as its hint; a new key lives in the draft until Save sends it. */
 function KeyField({ id, row, form, error, onChange }: KeyFieldProps) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const [shown, setShown] = useState(false)
   const [replacing, setReplacing] = useState(false)
   const hint = row.key_hint
   const editing = !hint || replacing || form.key !== ''
   const noteId = `${id}-note`
-  const date = row.key_saved_at ? new Date(row.key_saved_at).toLocaleDateString(lang) : ''
+  const date = row.key_saved_at ? fmt.date(row.key_saved_at) : ''
 
   let body: ReactNode
   if (hint && form.removeKey) {
@@ -602,7 +602,7 @@ function Headers({ form, errors, onChange }: { form: ProviderForm; errors: Error
 }
 
 function ConnStatus({ conn }: { conn?: Conn }) {
-  const { t } = useI18n()
+  const { t, fmt } = useI18n()
   if (!conn) return null
   if (conn.status === 'loading') return <span className="conn conn-loading">{t('chatbot.conn.testing')}</span>
   const { result } = conn
@@ -610,12 +610,12 @@ function ConnStatus({ conn }: { conn?: Conn }) {
     return (
       <span className="conn conn-ok">
         <Icon name="check" />
-        {t('chatbot.conn.ok', { ms: result.latencyMs, model: result.model })}
+        {t('chatbot.conn.ok', { ms: fmt.number(result.latencyMs), model: result.model })}
       </span>
     )
   }
   return (
-    <span className="conn conn-fail" title={result.error.message}>
+    <span className="conn conn-fail">
       <Icon name="alert" />
       {t(`chatbot.conn.err.${result.error.kind}`)}
     </span>
@@ -656,7 +656,7 @@ function Area({ path, label, hint, value, error, rows = 2, mono, onChange, foote
 }
 
 function SystemPrompt({ value, error, onChange }: { value: string; error?: string; onChange: (v: string) => void }) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const insert = (v: string) => {
     const el = document.getElementById(fieldId('settings.system_prompt')) as HTMLTextAreaElement | null
     const at = el?.selectionStart ?? value.length
@@ -667,7 +667,6 @@ function SystemPrompt({ value, error, onChange }: { value: string; error?: strin
       el?.setSelectionRange(at + v.length, at + v.length)
     })
   }
-  const fmt = (n: number) => n.toLocaleString(lang)
   return (
     <Area
       path="settings.system_prompt"
@@ -687,7 +686,7 @@ function SystemPrompt({ value, error, onChange }: { value: string; error?: strin
             ))}
           </div>
           <span className={value.length > PROMPT_MAX ? 'over' : undefined} aria-live="polite">
-            {t('chatbot.prompt.count', { n: fmt(value.length), max: fmt(PROMPT_MAX) })}
+            {t('chatbot.prompt.count', { n: fmt.number(value.length), max: fmt.number(PROMPT_MAX) })}
           </span>
         </div>
       }

@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react'
 import { en, type MessageKey } from './en'
 import { vi } from './vi'
+import type { Format } from './format'
 
 export type Lang = 'vi' | 'en'
 export type { MessageKey }
 export type Translate = (key: MessageKey, params?: Record<string, string | number>) => string
-export type I18n = { lang: Lang; setLang: (lang: Lang) => void; t: Translate }
+export type I18n = { lang: Lang; setLang: (lang: Lang) => void; t: Translate; fmt: Format }
 
 export const LANGS: readonly Lang[] = ['vi', 'en']
 // index.html reads the same key before first paint, so keep them in sync.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useI18n, type Translate } from '../i18n'
+import { useI18n } from '../i18n'
 import { Icon, type IconName } from '../ui/Icon'
 import type { InboxData, InboxStats as Stats } from './data'
 
@@ -9,7 +9,7 @@ export const LIVE_DEBOUNCE_MS = 2_000
 
 /** Today's numbers above the Inbox: refetched on live events and every minute. */
 export function InboxStats({ data, pageId }: { data: InboxData; pageId?: string }) {
-  const { t, lang } = useI18n()
+  const { t, fmt } = useI18n()
   const [stats, setStats] = useState<Stats | null>(null)
 
   useEffect(() => {
@@ -31,19 +31,16 @@ export function InboxStats({ data, pageId }: { data: InboxData; pageId?: string 
     }
   }, [data, pageId])
 
-  const num = new Intl.NumberFormat(lang)
   const none = '—'
   const items: [IconName, string, string, boolean?][] = [
-    ['inbox', t('inboxStats.open'), stats ? num.format(stats.open_conversations) : none],
+    ['inbox', t('inboxStats.open'), stats ? fmt.number(stats.open_conversations) : none],
     [
       'bot',
       t('inboxStats.botPct'),
-      stats?.customer_conversations
-        ? new Intl.NumberFormat(lang, { style: 'percent' }).format(stats.bot_handled / stats.customer_conversations)
-        : none,
+      stats?.customer_conversations ? fmt.percent(stats.bot_handled / stats.customer_conversations) : none,
     ],
-    ['clock', t('inboxStats.firstResponse'), stats?.avg_first_response_seconds != null ? duration(stats.avg_first_response_seconds, t, lang) : none],
-    ['user', t('inboxStats.waiting'), stats ? num.format(stats.waiting_for_human) : none, !!stats?.waiting_for_human],
+    ['clock', t('inboxStats.firstResponse'), stats?.avg_first_response_seconds != null ? fmt.duration(stats.avg_first_response_seconds) : none],
+    ['user', t('inboxStats.waiting'), stats ? fmt.number(stats.waiting_for_human) : none, !!stats?.waiting_for_human],
   ]
 
   return (
@@ -57,11 +54,4 @@ export function InboxStats({ data, pageId }: { data: InboxData; pageId?: string 
       ))}
     </dl>
   )
-}
-
-function duration(seconds: number, t: Translate, lang: string) {
-  const one = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 })
-  if (seconds < 60) return t('inboxStats.seconds', { n: one.format(seconds) })
-  if (seconds < 3600) return t('inboxStats.minutes', { n: Math.round(seconds / 60) })
-  return t('inboxStats.hours', { n: one.format(seconds / 3600) })
 }
