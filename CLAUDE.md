@@ -15,6 +15,7 @@ Admin console for a Facebook Page chatbot that answers job questions. Board: htt
 - One environment only. There is no separate dev project; test against the hosted project and clean up what tests create. Do not run a local Supabase stack.
 - **No CI runner and no GitHub Actions.** Checks (lint, typecheck, test, build) and deploys run on this machine through local scripts. The PM deploys after merging.
 - Deploy credentials are local: Cloudflare token in `~/.cloudflare-token`, Supabase access token in `~/.supabase-token`, everything else in the repo `.env` (git-ignored). GitHub Environment `production` keeps a copy for reuse only. Never print them.
+- Web: `cd web && npm run check` before pushing; `scripts/deploy-web.sh` deploys the current branch (a preview, or production from `main` at `origin/main`).
 
 ## Live testing
 
