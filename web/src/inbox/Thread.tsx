@@ -5,7 +5,10 @@ import { Drawer } from '../ui/Dialog'
 import { Icon, type IconName } from '../ui/Icon'
 import { useToast } from '../ui/toast-context'
 import { attachmentTypes, eventText, isStatus, parseEvent, shortTime, type ConversationRow, type InboxData, type MessageRow, type SystemEvent } from './data'
+import { CustomerInfo } from './CustomerInfo'
+import { Trace } from './Trace'
 import { useThread } from './useThread'
+import { useWide } from './useWide'
 
 const NEAR_BOTTOM = 48
 
@@ -23,6 +26,7 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
   const toast = useToast()
   const { messages, hasMore, status, loadingOlder, reload, loadOlder } = useThread(data, conversation.id)
   const [infoOpen, setInfoOpen] = useState(false)
+  const wide = useWide()
   // Fixed per mount: the thread remounts per conversation.
   const [now] = useState(() => new Date())
   const log = useRef<HTMLOListElement>(null)
@@ -89,7 +93,7 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
             <StatusBadge status={conversation.status} />
           </div>
         </div>
-        <Button variant="ghost" size="sm" icon="user" label={t('inbox.details')} onClick={() => setInfoOpen(true)} />
+        {!wide && <Button variant="ghost" size="sm" icon="user" label={t('inbox.details')} onClick={() => setInfoOpen(true)} />}
       </header>
       {status === 'error' ? (
         <div className="ib-placeholder">
@@ -133,8 +137,9 @@ export function Thread({ data, conversation, pageName, onBack, footer }: ThreadP
         </div>
       )}
       {footer}
-      <Drawer open={infoOpen} onClose={() => setInfoOpen(false)} title={t('inbox.details')}>
-        <CustomerInfo conversation={conversation} name={name} pageName={pageName} />
+      <Drawer open={infoOpen && !wide} onClose={() => setInfoOpen(false)} title={t('inbox.details')}>
+        {/* Mounted only while open: the wide layout shows its own copy, and closing saves a pending note. */}
+        {infoOpen && !wide && <CustomerInfo data={data} conversation={conversation} name={name} pageName={pageName} />}
       </Drawer>
     </>
   )
@@ -173,6 +178,7 @@ function MessageItem({ message: m, time }: { message: MessageRow; time: string }
     <li className={`im im-${outgoing ? m.sender_kind : 'user'}${outgoing && failed ? ' is-failed' : ''}`}>
       <div className="im-body">
         {m.text && <div className="bubble">{m.text}</div>}
+        {m.sender_kind === 'bot' && <Trace trace={m.trace} />}
         {attachmentTypes(m.attachments).map((type, i) => (
           <span key={i} className="im-attach">
             <Icon name="paperclip" />
@@ -214,32 +220,5 @@ export function Avatar({ conversation }: { conversation: ConversationRow }) {
     <span className="p-av" aria-hidden="true">
       {initials || '?'}
     </span>
-  )
-}
-
-/** Basic customer details. The full panel comes with the customer info work. */
-function CustomerInfo({ conversation, name, pageName }: { conversation: ConversationRow; name: string; pageName: string }) {
-  const { t } = useI18n()
-  return (
-    <dl className="ctx-dl">
-      <dt>{t('inbox.info.name')}</dt>
-      <dd>{name}</dd>
-      <dt>{t('inbox.info.psid')}</dt>
-      <dd>
-        <code>{conversation.psid}</code>
-      </dd>
-      <dt>{t('inbox.info.page')}</dt>
-      <dd>{pageName}</dd>
-      <dt>{t('inbox.info.status')}</dt>
-      <dd>
-        <StatusBadge status={conversation.status} />
-      </dd>
-      {conversation.handoff_reason && (
-        <>
-          <dt>{t('inbox.info.handoff')}</dt>
-          <dd>{conversation.handoff_reason}</dd>
-        </>
-      )}
-    </dl>
   )
 }

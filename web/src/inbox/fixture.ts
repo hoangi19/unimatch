@@ -16,6 +16,8 @@ export function liveData(patch: Partial<InboxData> = {}) {
     loadUnread: vi.fn(async () => []),
     markRead: vi.fn(async () => {}),
     subscribe: vi.fn(subscribe),
+    loadDetails: vi.fn(async () => ({ notes: '', language: null, created_at: '2026-11-01T09:00:00Z', stats: { user: 0, bot: 0, admin: 0, handoffs: 0 } })),
+    saveNotes: vi.fn(async () => {}),
     ...patch,
   }
   return { data, emit: (event: LiveEvent) => send(event) }

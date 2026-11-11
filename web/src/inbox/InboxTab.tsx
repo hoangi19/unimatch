@@ -14,7 +14,9 @@ import {
   type InboxData,
   type InboxPage,
 } from './data'
+import { CustomerInfo } from './CustomerInfo'
 import { Avatar, StatusBadge, Thread } from './Thread'
+import { useWide } from './useWide'
 import './inbox.css'
 
 type Loaded = { pages: InboxPage[]; conversations: ConversationRow[]; now: Date }
@@ -27,6 +29,7 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
   const [filter, setFilter] = useState<Filter>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const pageSelectId = useId()
+  const wide = useWide()
 
   const load = useCallback(() => {
     Promise.all([data.loadPages(), data.loadConversations()]).then(
@@ -204,6 +207,11 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
             </div>
           )}
         </section>
+        {wide && selected && (
+          <aside className="ib-ctx" aria-label={t('inbox.ctx.title')}>
+            <CustomerInfo key={selected.id} data={data} conversation={selected} name={selected.customer_name ?? t('inbox.noName')} pageName={pageName(selected.page_id)} />
+          </aside>
+        )}
       </div>
     </div>
   )

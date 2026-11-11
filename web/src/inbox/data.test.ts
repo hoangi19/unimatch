@@ -8,6 +8,7 @@ import {
   matchesSearch,
   mergeMessages,
   parseEvent,
+  parseTrace,
   shortTime,
   sortConversations,
   type LiveListener,
@@ -107,5 +108,40 @@ describe('createHub', () => {
     expect(close).toHaveBeenCalledOnce()
     subscribe(a)
     expect(open).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('parseTrace', () => {
+  it('reads a full reply trace', () => {
+    const trace = {
+      provider: 'openai',
+      model: 'gpt-x',
+      latencyMs: 880,
+      tokens: { inputTokens: 120, outputTokens: 40 },
+      gate: { botEnabled: true, status: 'bot', hours: 'open', botMessagesLastHour: 3, rateLimitPerHour: 20 },
+      fallback: 'timeout',
+      replyUpTo: '2026-11-10T08:00:00Z',
+    }
+    expect(parseTrace(trace)).toEqual({
+      provider: 'openai',
+      model: 'gpt-x',
+      latencyMs: 880,
+      tokens: { input: 120, output: 40 },
+      hours: 'open',
+      rate: { used: 3, limit: 20 },
+      fallback: 'timeout',
+    })
+  })
+
+  it('reads a handoff notice and maps unknown reasons to other', () => {
+    expect(parseTrace({ handoff: 'keyword', replyUpTo: 'x' })).toMatchObject({ handoff: 'keyword', provider: undefined })
+    expect(parseTrace({ handoff: 'new_reason' })?.handoff).toBe('other')
+  })
+
+  it('drops fields of the wrong type and has no trace for missing or non-object values', () => {
+    expect(parseTrace({ provider: 7, latencyMs: 'slow', tokens: 'many' })).toEqual({ tokens: { input: undefined, output: undefined } })
+    expect(parseTrace(null)).toBeNull()
+    expect(parseTrace([1])).toBeNull()
+    expect(parseTrace('x')).toBeNull()
   })
 })

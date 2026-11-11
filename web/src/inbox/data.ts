@@ -33,6 +33,8 @@ export type InboxData = {
   markRead(conversationId: string): Promise<void>
   /** Live row changes. All listeners share one connection; returns the unsubscribe. */
   subscribe(listener: LiveListener): () => void
+  loadDetails(conversationId: string): Promise<ConversationDetails>
+  saveNotes(conversationId: string, notes: string): Promise<void>
 }
 
 /** `resync`: the connection came back and rows may have been missed, so refetch. */
@@ -69,6 +71,7 @@ export const unreadTotal = (counts: Map<string, number>) => [...counts.values()]
 // shortcut: the list loads at most this many conversations and filters them in the browser; page on the server when a deployment outgrows it.
 export const CONVERSATION_LIMIT = 500
 export const MESSAGE_PAGE = 50
+export const NOTES_DEBOUNCE_MS = 800
 
 export const STATUSES = ['needs_human', 'bot', 'human', 'closed'] as const
 export type Status = (typeof STATUSES)[number]
@@ -154,4 +157,40 @@ export function eventText(t: Translate, event: SystemEvent, legacyText: string |
   if (!event.reason) return event.code === 'other' && legacyText ? `${head}: ${legacyText}` : head
   const reason = event.reason === 'keyword' && event.keyword ? t('inbox.reason.keywordNamed', { keyword: event.keyword }) : t(`inbox.reason.${event.reason}`)
   return `${head} · ${reason}`
+}
+
+export type MessageStats = { user: number; bot: number; admin: number; handoffs: number }
+export type ConversationDetails = Pick<Tables<'conversations'>, 'notes' | 'language' | 'created_at'> & { stats: MessageStats }
+
+export type Trace = {
+  provider?: string
+  model?: string
+  latencyMs?: number
+  tokens?: { input?: number; output?: number }
+  /** Reply-hours decision and the hourly rate limit the gate saw. */
+  hours?: string
+  rate?: { used?: number; limit?: number }
+  handoff?: (typeof EVENT_REASONS)[number] | 'other'
+  fallback?: string
+}
+
+const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined)
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
+
+/** Reads a bot message's `trace`; null when there is none. Fields of the wrong type are dropped. */
+export function parseTrace(trace: Json | null): Trace | null {
+  if (!trace || typeof trace !== 'object' || Array.isArray(trace)) return null
+  const tokens = obj(trace.tokens)
+  const gate = obj(trace.gate)
+  return {
+    provider: str(trace.provider),
+    model: str(trace.model),
+    latencyMs: num(trace.latencyMs),
+    ...(trace.tokens != null && { tokens: { input: num(tokens.inputTokens), output: num(tokens.outputTokens) } }),
+    hours: str(gate.hours),
+    ...(trace.gate != null && { rate: { used: num(gate.botMessagesLastHour), limit: num(gate.rateLimitPerHour) } }),
+    ...(trace.handoff != null && { handoff: oneOf(EVENT_REASONS, trace.handoff) }),
+    fallback: str(trace.fallback),
+  }
 }

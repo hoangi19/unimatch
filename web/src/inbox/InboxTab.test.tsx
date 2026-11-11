@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, translate, type MessageKey } from '../i18n'
 import { ToastProvider } from '../ui/ToastProvider'
-import { MESSAGE_PAGE, type InboxData } from './data'
+import { MESSAGE_PAGE, NOTES_DEBOUNCE_MS, type ConversationDetails, type InboxData } from './data'
 import { conv, liveData, msg } from './fixture'
 import { InboxTab } from './InboxTab'
 
@@ -28,8 +28,10 @@ const CONVERSATIONS = [
   conv({ id: 'c-closed', customer_name: 'Chi Đóng', status: 'closed', last_message_at: '2026-11-05T10:00:00Z', last_message_preview: 'cảm ơn' }),
 ]
 
+const DETAILS: ConversationDetails = { notes: 'Hỏi về Data Engineer', language: 'vi', created_at: '2026-11-01T09:00:00Z', stats: { user: 5, bot: 3, admin: 1, handoffs: 2 } }
+
 const fakeLive = (patch: Partial<InboxData> = {}) =>
-  liveData({ loadPages: vi.fn(async () => PAGES), loadConversations: vi.fn(async () => CONVERSATIONS), ...patch })
+  liveData({ loadPages: vi.fn(async () => PAGES), loadConversations: vi.fn(async () => CONVERSATIONS), loadDetails: vi.fn(async () => DETAILS), ...patch })
 const fakeData = (patch: Partial<InboxData> = {}): InboxData => fakeLive(patch).data
 
 const renderTab = (data: InboxData, onConnectPage?: () => void) =>
@@ -143,5 +145,78 @@ describe('thread', () => {
     expect(within(dialog).getByText('psid-1')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: t('inbox.back') }))
     await waitFor(() => expect(grid.getAttribute('data-pane')).toBe('list'))
+  })
+})
+
+describe('customer panel', () => {
+  // Pretends the window is wide enough for the third column.
+  const wide = () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('min-width'), addEventListener() {}, removeEventListener() {} }))
+  }
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('shows profile and stats in a third column on wide screens', async () => {
+    wide()
+    renderTab(fakeData())
+    fireEvent.click(await screen.findByText('An Bot'))
+    const panel = screen.getByRole('complementary', { name: t('inbox.ctx.title') })
+    expect(await within(panel).findByText(t('inbox.ctx.lang.vi'))).toBeTruthy()
+    expect(within(panel).getByText('psid-1')).toBeTruthy()
+    expect(within(panel).getByText(t('inbox.ctx.handoffs')).previousElementSibling!.textContent).toBe('2')
+    expect(within(panel).getByLabelText(t('inbox.ctx.notes'))).toHaveProperty('value', 'Hỏi về Data Engineer')
+    // The drawer button is only for narrow screens.
+    expect(screen.queryByRole('button', { name: t('inbox.details') })).toBeNull()
+  })
+
+  it('autosaves notes after a pause and saves a pending edit when switching conversation', async () => {
+    wide()
+    const data = fakeData()
+    renderTab(data)
+    fireEvent.click(await screen.findByText('An Bot'))
+    const notes = await screen.findByLabelText(t('inbox.ctx.notes'))
+    vi.useFakeTimers()
+    fireEvent.change(notes, { target: { value: 'a' } })
+    fireEvent.change(notes, { target: { value: 'ab' } })
+    expect(data.saveNotes).not.toHaveBeenCalled()
+    await act(async () => vi.advanceTimersByTime(NOTES_DEBOUNCE_MS))
+    expect(data.saveNotes).toHaveBeenCalledExactlyOnceWith('c-bot', 'ab')
+    vi.useRealTimers()
+    expect(await screen.findByText(t('inbox.ctx.saved'))).toBeTruthy()
+
+    fireEvent.change(notes, { target: { value: 'abc' } })
+    fireEvent.click(screen.getByText('Bình Cần'))
+    await waitFor(() => expect(data.saveNotes).toHaveBeenLastCalledWith('c-bot', 'abc'))
+    expect(data.loadDetails).toHaveBeenLastCalledWith('c-needs')
+  })
+
+  it('shows a retry when a note does not save', async () => {
+    wide()
+    const saveNotes = vi.fn().mockRejectedValueOnce(new Error('down')).mockResolvedValue(undefined)
+    renderTab(fakeData({ saveNotes }))
+    fireEvent.click(await screen.findByText('An Bot'))
+    const notes = await screen.findByLabelText(t('inbox.ctx.notes'))
+    fireEvent.change(notes, { target: { value: 'x' } })
+    fireEvent.blur(notes)
+    fireEvent.click(await screen.findByRole('button', { name: t('inbox.ctx.saveRetry') }))
+    expect(await screen.findByText(t('inbox.ctx.saved'))).toBeTruthy()
+    expect(saveNotes).toHaveBeenCalledTimes(2)
+  })
+
+  it('explains bot replies from their trace and shows — for missing fields', async () => {
+    const loadMessages = vi.fn(async () => [
+      msg({ id: 'b1', sender_kind: 'bot', text: 'Có ạ', trace: { provider: 'openai', model: 'gpt-x', latencyMs: 880 } }),
+      msg({ id: 'b2', sender_kind: 'bot', text: 'Cũ', trace: null }),
+    ])
+    renderTab(fakeData({ loadMessages }))
+    fireEvent.click(await screen.findByText('An Bot'))
+    const reply = (await screen.findByText('Có ạ')).closest('li')!
+    expect(within(reply).getByText(/openai · gpt-x/)).toBeTruthy()
+    expect(within(reply).getByText(t('inbox.trace.latencyMs', { n: '880' }))).toBeTruthy()
+    expect(within(reply).getByText(t('inbox.trace.tokens')).nextElementSibling!.textContent).toBe('—')
+    // Old rows have no trace and no expander.
+    expect(within(screen.getByText('Cũ').closest('li')!).queryByText(t('inbox.trace.why'))).toBeNull()
   })
 })
