@@ -152,6 +152,16 @@ Sign-up is off and only `app_metadata.role = 'admin'` passes `is_admin()`. `user
 
 To remove admin rights, remove the `role` key the same way, or delete the user.
 
+### 6. Job data
+
+`public.jobs` holds scraped job postings (LinkedIn, Facebook groups), one row per `(source, external_id)`. Typed columns hold what the bot and the Dataset tab filter or show; `raw` keeps the full original record. Only admins can read it and only `service_role` writes it. The source file has personal data (contact numbers, poster profiles): keep it out of git (`all_jobs.json` is ignored) and never paste its rows anywhere.
+
+```sh
+deno run --env-file=.env -A scripts/import-jobs.ts all_jobs.json
+```
+
+The script upserts on `(source, external_id)`, so re-running updates rows instead of duplicating them. It turns `"null"` and empty strings into `NULL`, and prints only inserted / updated / skipped counts. A record without `id`, `source` or `title` is skipped, with the reason counted.
+
 ## Checks
 
 There is no CI. Run these yourself before pushing:

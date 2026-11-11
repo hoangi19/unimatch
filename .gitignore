@@ -6,3 +6,4 @@ supabase/.branches/
 node_modules/
 dist/
 !.env.example
+all_jobs.json
