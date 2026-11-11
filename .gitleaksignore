@@ -1,3 +1,5 @@
 # demo/index.html mock verify token (fake UI data, not a real secret)
 eb11c0badfd1aba239bc8b9b6665d2b550b3cbfd:demo/index.html:generic-api-key:1639
 demo/index.html:generic-api-key:1639
+# same mock token, copied into the web build output
+web/dist/demo/index.html:generic-api-key:1639
