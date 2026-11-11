@@ -236,6 +236,7 @@ export type Database = {
           reply_delay_ms: number
           reply_hours: Json
           reply_mode: string
+          token_checked_at: string | null
           token_expires_at: string | null
         }
         Insert: {
@@ -249,6 +250,7 @@ export type Database = {
           reply_delay_ms?: number
           reply_hours?: Json
           reply_mode?: string
+          token_checked_at?: string | null
           token_expires_at?: string | null
         }
         Update: {
@@ -262,6 +264,7 @@ export type Database = {
           reply_delay_ms?: number
           reply_hours?: Json
           reply_mode?: string
+          token_checked_at?: string | null
           token_expires_at?: string | null
         }
         Relationships: []
@@ -346,6 +349,10 @@ export type Database = {
         }
         Returns: string
       }
+      record_token_check: {
+        Args: { p_page_id: string; p_valid: boolean }
+        Returns: undefined
+      }
       remove_provider_key: {
         Args: { p_kind: Database["public"]["Enums"]["ai_provider_kind"] }
         Returns: undefined
@@ -373,6 +380,7 @@ export type Database = {
           key_saved_at: string
         }[]
       }
+      token_health_secret_ok: { Args: { p_secret: string }; Returns: boolean }
     }
     Enums: {
       ai_provider_kind: "hermes" | "openai" | "anthropic" | "custom"
