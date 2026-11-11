@@ -144,3 +144,39 @@ Deno.test("a missing app secret fails closed with a clear 500, never accepting t
   }
   assertEquals([stored.length, errors], [0, ["meta-webhook: META_APP_SECRET is not set"]]);
 });
+
+// A body that never ends on its own: the handler must stop reading and cancel it, or the client hangs.
+function endlessBody() {
+  let sent = 0;
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(c) {
+      sent += 64 * 1024;
+      c.enqueue(new Uint8Array(64 * 1024).fill(97));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  return { stream, sent: () => sent, cancelled: () => cancelled };
+}
+
+Deno.test("an oversized streamed body is cancelled right after the limit, then 413", async () => {
+  const { deps, stored } = fakeDeps();
+  const body = endlessBody();
+  const res = await handler(new Request("http://localhost/meta-webhook", { method: "POST", body: body.stream }), deps);
+  assertEquals([res.status, body.cancelled(), stored.length], [413, true, 0]);
+  assert(body.sent() <= MAX_BODY_BYTES + 2 * 64 * 1024, "read far past the limit");
+});
+
+Deno.test("a declared Content-Length over the limit cancels the body unread, then 413", async () => {
+  const { deps } = fakeDeps();
+  const body = endlessBody();
+  const req = new Request("http://localhost/meta-webhook", {
+    method: "POST",
+    body: body.stream,
+    headers: { "content-length": String(MAX_BODY_BYTES + 1) },
+  });
+  const res = await handler(req, deps);
+  assertEquals([res.status, body.cancelled()], [413, true]);
+});
