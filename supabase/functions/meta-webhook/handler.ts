@@ -33,6 +33,36 @@ function safeEqual(a: string, b: string): boolean {
 // Meta batches are a few KB; anything far bigger is not from Meta.
 export const MAX_BODY_BYTES = 1024 * 1024;
 
+// The body as text, or null once it passes MAX_BODY_BYTES. The stream is cancelled on the way out:
+// the hosted runtime holds the response until an unread request body is consumed.
+async function readCapped(req: Request): Promise<string | null> {
+  if (!req.body) return "";
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) {
+    await req.body.cancel();
+    return null;
+  }
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.length;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 type MessagingItem = {
   sender?: { id?: string };
   timestamp?: number;
@@ -82,9 +112,8 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-  if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return new Response("Payload Too Large", { status: 413 });
-  const body = await req.text();
-  if (new TextEncoder().encode(body).length > MAX_BODY_BYTES) return new Response("Payload Too Large", { status: 413 });
+  const body = await readCapped(req);
+  if (body === null) return new Response("Payload Too Large", { status: 413 });
   // An empty key makes importKey throw; say why instead of crashing on every signed delivery.
   if (!deps.appSecret) {
     console.error("meta-webhook: META_APP_SECRET is not set");
