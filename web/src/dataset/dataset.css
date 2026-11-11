@@ -66,6 +66,8 @@
   .ds-nowrap { white-space: nowrap; }
   .ds-more { text-align: center; padding: 8px; }
   .ds-foot { justify-content: space-between; }
+  .ds-emb .grid-2 { gap: var(--space-xl); }
+  .ds-emb .self-start { justify-self: start; }
   .ds-detail, .ds-block { display: grid; gap: var(--space-lg); }
   .ds-block { gap: 8px; }
   .ds-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
