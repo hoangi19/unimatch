@@ -1,5 +1,10 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { CONVERSATION_COLUMNS, CONVERSATION_LIMIT, createHub, MESSAGE_PAGE, type ConversationRow, type InboxData, type MessageRow } from './data'
+
+function check(error: PostgrestError | null) {
+  if (error) throw new Error(error.message)
+}
 
 function rows<T>({ data, error }: { data: T[] | null; error: { message: string } | null }): T[] {
   if (error) throw new Error(error.message)
@@ -46,5 +51,25 @@ export const supabaseInboxData: InboxData = {
     if (before) query = query.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`)
     const page = rows(await query.order('created_at', { ascending: false }).order('id', { ascending: false }).limit(MESSAGE_PAGE))
     return page.reverse()
+  },
+  async loadDetails(conversationId) {
+    // Head-only counts: index-backed, no rows come back.
+    const count = (sender: string) =>
+      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('sender_kind', sender)
+    const [conv, user, bot, admin, handoffs] = await Promise.all([
+      supabase.from('conversations').select('notes, language, created_at').eq('id', conversationId).single(),
+      count('user'),
+      count('bot'),
+      count('admin'),
+      count('system').eq('event->>code', 'handoff'),
+    ])
+    ;[conv, user, bot, admin, handoffs].forEach((r) => check(r.error))
+    return { ...conv.data!, stats: { user: user.count ?? 0, bot: bot.count ?? 0, admin: admin.count ?? 0, handoffs: handoffs.count ?? 0 } }
+  },
+  async saveNotes(conversationId, notes) {
+    // RLS hides the row from non-admins, so zero updated rows is an error too.
+    const { data, error } = await supabase.from('conversations').update({ notes }).eq('id', conversationId).select('id')
+    check(error)
+    if (!data?.length) throw new Error('conversation not found')
   },
 }

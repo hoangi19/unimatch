@@ -114,13 +114,46 @@
   .ev.warn { background: var(--warning-soft); border-color: transparent; color: var(--fg); }
   .ev.warn .ic { color: var(--warning); }
 
-  .ctx-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 16px; margin: 0; align-content: start; }
-  .ctx-dl dt { font-size: var(--text-xs); color: var(--muted-fg); }
+  /* Customer details: third column on wide screens, drawer otherwise. */
+  .ib-grid:has(> .ib-ctx) { grid-template-columns: 330px minmax(0, 1fr) 300px; }
+  .ib-ctx { border-left: 1px solid var(--border-soft); overflow-y: auto; padding: 14px; min-height: 0; }
+  .ctx { display: grid; gap: 18px; align-content: start; }
+  .ctx-sec { display: grid; gap: 8px; }
+  .ctx-sec h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-fg); font-family: var(--font-body); }
+  .ctx-profile { display: flex; align-items: center; gap: 10px; }
+  .ctx-profile > div { display: grid; min-width: 0; }
+  .ctx-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 0; }
+  .ctx-dl dt { font-size: 11px; color: var(--muted-fg); }
   .ctx-dl dd { margin: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+  .ctx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ctx-stats > div { display: grid; padding: 8px 10px; border-radius: var(--radius); background: var(--subtle); }
+  .ctx-stats .v { font-family: var(--font-head); font-weight: 600; font-size: var(--text-md); font-variant-numeric: tabular-nums; }
+  .ctx-stats .k { font-size: 11px; color: var(--muted-fg); }
+  .ctx .textarea { padding: 8px 12px; resize: vertical; line-height: 1.5; min-height: 88px; }
+  .ctx .hint { display: flex; align-items: flex-start; gap: 6px; }
+  .ctx .hint .ic { width: 12px; height: 12px; flex: none; margin-top: 2px; }
+  .ctx-save { min-height: 20px; font-size: var(--text-xs); }
+  .ctx-save .ok { color: var(--success); }
+  .ctx-save-err { display: inline-flex; align-items: center; gap: 6px; color: var(--danger-text); font-weight: 600; }
+
+  /* Why the bot replied: expander under a bot bubble. */
+  .im .debug { width: min(100%, 420px); border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); font-size: var(--text-xs); }
+  .im .debug summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; color: var(--muted-fg); font-weight: 500; }
+  .im .debug summary::-webkit-details-marker { display: none; }
+  .im .debug summary:hover { color: var(--fg); }
+  .im .debug summary:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: var(--radius); }
+  .im .debug summary .ic { width: 14px; height: 14px; flex: none; }
+  .im .debug summary .chev { margin-left: auto; transition: transform var(--dur) ease; }
+  .im .debug[open] summary .chev { transform: rotate(180deg); }
+  .why-label { color: var(--fg); font-weight: 600; }
+  .trace-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 0; padding: 4px 10px 10px; }
+  .trace-dl dt { color: var(--muted-fg); }
+  .trace-dl dd { margin: 0; color: var(--fg); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 }
 
 @media (max-width: 1280px) {
   .ib-grid { grid-template-columns: 300px minmax(0, 1fr); }
+  .ib-grid:has(> .ib-ctx) { grid-template-columns: 300px minmax(0, 1fr) 280px; }
 }
 @media (max-width: 900px) {
   .app.inbox-mode .view { padding: 10px 12px 12px; }
