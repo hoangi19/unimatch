@@ -11,12 +11,28 @@ export function useThread(data: InboxData, conversationId: string) {
 
   const load = useCallback(() => {
     data.loadMessages(conversationId).then(
-      (page) => setState({ messages: page, hasMore: page.length === MESSAGE_PAGE, status: 'ready', loadingOlder: false }),
+      // Keep live messages that arrived while the page loaded.
+      (page) => setState((s) => ({ messages: mergeMessages(page, s.messages), hasMore: page.length === MESSAGE_PAGE, status: 'ready', loadingOlder: false })),
       () => setState((s) => ({ ...s, status: 'error' })),
     )
   }, [data, conversationId])
 
   useEffect(load, [load])
+
+  useEffect(
+    () =>
+      data.subscribe((event) => {
+        if (event.type === 'message' && event.row.conversation_id === conversationId)
+          setState((s) => ({ ...s, messages: mergeMessages(s.messages, [event.row]) }))
+        // Refetch the newest page and keep older pages already shown.
+        if (event.type === 'resync')
+          data.loadMessages(conversationId).then(
+            (page) => setState((s) => (s.status === 'ready' ? { ...s, messages: mergeMessages(s.messages, page) } : s)),
+            () => {},
+          )
+      }),
+    [data, conversationId],
+  )
 
   /** Resolves false when the request failed. */
   const loadOlder = async () => {

@@ -8,6 +8,7 @@ import {
   matchesSearch,
   shortTime,
   sortConversations,
+  upsertConversation,
   type ConversationRow,
   type Filter,
   type InboxData,
@@ -35,6 +36,36 @@ export function InboxTab({ data, onConnectPage }: { data: InboxData; onConnectPa
   }, [data])
 
   useEffect(load, [load])
+
+  useEffect(
+    () =>
+      data.subscribe((event) => {
+        const apply = (update: (rows: ConversationRow[]) => ConversationRow[]) =>
+          setLoaded((l) => (l && l !== 'error' ? { ...l, conversations: update(l.conversations), now: new Date() } : l))
+        if (event.type === 'conversation') apply((rows) => upsertConversation(rows, event.row))
+        if (event.type === 'conversationDeleted') apply((rows) => rows.filter((r) => r.id !== event.id))
+        // Quiet refetch: the list stays on screen; a failure keeps the rows already shown.
+        if (event.type === 'resync') data.loadConversations().then((rows) => apply(() => rows), () => {})
+      }),
+    [data],
+  )
+
+  const open = loaded && loaded !== 'error' ? loaded.conversations.find((c) => c.id === selectedId) : undefined
+  const openUnread = open ? open.unread_count : 0
+
+  // Mark as read while the conversation is open and the browser tab is visible; Realtime carries it to other tabs.
+  useEffect(() => {
+    if (!selectedId || !openUnread) return
+    const markRead = () => {
+      if (document.visibilityState !== 'visible') return
+      setLoaded((l) => (l && l !== 'error' ? { ...l, conversations: l.conversations.map((c) => (c.id === selectedId ? { ...c, unread_count: 0 } : c)) } : l))
+      // A failed write is left alone: the next live row shows the real count.
+      data.markRead(selectedId).catch(() => {})
+    }
+    markRead()
+    document.addEventListener('visibilitychange', markRead)
+    return () => document.removeEventListener('visibilitychange', markRead)
+  }, [data, selectedId, openUnread])
 
   if (loaded === 'error') {
     return (

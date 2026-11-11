@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { I18nProvider, translate, type MessageKey } from '../i18n'
 import { ToastProvider } from '../ui/ToastProvider'
-import { MESSAGE_PAGE, type InboxData, type MessageRow } from './data'
-import { conv, msg } from './fixture'
+import { MESSAGE_PAGE, type InboxData } from './data'
+import { conv, liveData, msg } from './fixture'
 import { InboxTab } from './InboxTab'
 
 beforeAll(() => {
@@ -28,14 +28,9 @@ const CONVERSATIONS = [
   conv({ id: 'c-closed', customer_name: 'Chi Đóng', status: 'closed', last_message_at: '2026-11-05T10:00:00Z', last_message_preview: 'cảm ơn' }),
 ]
 
-function fakeData(patch: Partial<InboxData> = {}): InboxData {
-  return {
-    loadPages: vi.fn(async () => PAGES),
-    loadConversations: vi.fn(async () => CONVERSATIONS),
-    loadMessages: vi.fn(async (): Promise<MessageRow[]> => []),
-    ...patch,
-  }
-}
+const fakeLive = (patch: Partial<InboxData> = {}) =>
+  liveData({ loadPages: vi.fn(async () => PAGES), loadConversations: vi.fn(async () => CONVERSATIONS), ...patch })
+const fakeData = (patch: Partial<InboxData> = {}): InboxData => fakeLive(patch).data
 
 const renderTab = (data: InboxData, onConnectPage?: () => void) =>
   render(

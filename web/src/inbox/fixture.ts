@@ -1,5 +1,25 @@
 // Test rows for the Inbox tab.
-import type { ConversationRow, MessageRow } from './data'
+import { vi } from 'vitest'
+import { createHub, type ConversationRow, type InboxData, type LiveEvent, type LiveListener, type MessageRow } from './data'
+
+/** Stub data with a live feed; `emit` pushes an event to every subscriber. */
+export function liveData(patch: Partial<InboxData> = {}) {
+  let send: LiveListener = () => {}
+  const subscribe = createHub((emit) => {
+    send = emit
+    return () => (send = () => {})
+  })
+  const data: InboxData = {
+    loadPages: vi.fn(async () => []),
+    loadConversations: vi.fn(async (): Promise<ConversationRow[]> => []),
+    loadMessages: vi.fn(async (): Promise<MessageRow[]> => []),
+    loadUnread: vi.fn(async () => []),
+    markRead: vi.fn(async () => {}),
+    subscribe: vi.fn(subscribe),
+    ...patch,
+  }
+  return { data, emit: (event: LiveEvent) => send(event) }
+}
 
 export const conv = (patch: Partial<ConversationRow> = {}): ConversationRow => ({
   id: 'c1',
